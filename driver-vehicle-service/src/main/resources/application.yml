@@ -1,0 +1,24 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: driver-vehicle-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:driver_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:root}
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+ridelink:
+  jwt:
+    secret: ${JWT_SECRET:ridelink-shared-secret-key-for-it3130-group-assignment-change-me}
+    expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+  internal:
+    api-key: ${INTERNAL_API_KEY:ridelink-internal-service-key-change-me}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

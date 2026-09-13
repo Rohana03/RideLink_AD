@@ -1,0 +1,36 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: ride-management-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ride_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:root}
+  jpa:
+    hibernate:
+      ddl-auto: update
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+ridelink:
+  jwt:
+    secret: ${JWT_SECRET:ridelink-shared-secret-key-for-it3130-group-assignment-change-me}
+    expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+  internal:
+    api-key: ${INTERNAL_API_KEY:ridelink-internal-service-key-change-me}
+  services:
+    driver-vehicle-base-url: ${DRIVER_SERVICE_URL:http://localhost:8082}
+    fare-payment-base-url: ${FARE_SERVICE_URL:http://localhost:8084}
+  rabbit:
+    ride-events-exchange: ride.events.exchange
+    ride-completed-routing-key: ride.completed
+    ride-completed-queue: ride.completed.queue
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
