@@ -51,7 +51,7 @@ public class InternalDriverController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get driver by ID (internal)", description = "Interservice retrieval of driver and vehicle profile")
-    public ResponseEntity<DriverResponse> getDriverById(@PathVariable Long id) {
+    public ResponseEntity<DriverResponse> getDriverById(@PathVariable String id) {
         DriverResponse response = driverService.getDriverById(id);
         return ResponseEntity.ok(response);
     }
@@ -59,7 +59,7 @@ public class InternalDriverController {
     @PatchMapping("/{id}/status")
     @Operation(summary = "Update driver status (internal)", description = "Used by Ride Management Service to set ON_TRIP or AVAILABLE")
     public ResponseEntity<DriverResponse> updateDriverStatus(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody InternalStatusUpdateRequest request
     ) {
         log.info("Interservice status update for driver ID {}: {}", id, request.getStatus());
@@ -70,7 +70,7 @@ public class InternalDriverController {
     @PutMapping("/{id}/location")
     @Operation(summary = "Update driver location (internal/simulation)", description = "Direct simulated location update for automated test scripts")
     public ResponseEntity<DriverResponse> updateDriverLocation(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody LocationUpdateRequest request
     ) {
         DriverResponse response = driverService.updateInternalLocation(id, request.getLatitude(), request.getLongitude());

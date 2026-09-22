@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Builder
 public class DriverResponse {
 
-    private Long id;
+    private String id;
     private String userId;
     private String fullName;
     private String email;

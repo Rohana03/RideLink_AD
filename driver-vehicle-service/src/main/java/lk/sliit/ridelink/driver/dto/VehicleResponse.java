@@ -13,7 +13,6 @@ import lombok.NoArgsConstructor;
 @Builder
 public class VehicleResponse {
 
-    private Long id;
     private String make;
     private String model;
     private Integer year;
@@ -27,7 +26,6 @@ public class VehicleResponse {
             return null;
         }
         return VehicleResponse.builder()
-                .id(vehicle.getId())
                 .make(vehicle.getMake())
                 .model(vehicle.getModel())
                 .year(vehicle.getYear())

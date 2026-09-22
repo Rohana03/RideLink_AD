@@ -83,7 +83,7 @@ public class DriverController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get driver by ID", description = "Retrieves public driver operational profile and vehicle by driver ID")
-    public ResponseEntity<DriverResponse> getDriverById(@PathVariable Long id) {
+    public ResponseEntity<DriverResponse> getDriverById(@PathVariable String id) {
         DriverResponse response = driverService.getDriverById(id);
         return ResponseEntity.ok(response);
     }

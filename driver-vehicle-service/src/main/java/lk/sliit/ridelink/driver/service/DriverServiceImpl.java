@@ -5,11 +5,9 @@ import lk.sliit.ridelink.driver.entity.*;
 import lk.sliit.ridelink.driver.exception.DuplicateResourceException;
 import lk.sliit.ridelink.driver.exception.ResourceNotFoundException;
 import lk.sliit.ridelink.driver.repository.DriverRepository;
-import lk.sliit.ridelink.driver.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -22,10 +20,8 @@ import java.util.stream.Collectors;
 public class DriverServiceImpl implements DriverService {
 
     private final DriverRepository driverRepository;
-    private final VehicleRepository vehicleRepository;
 
     @Override
-    @Transactional
     public DriverResponse registerDriver(String userId, DriverRegistrationRequest request) {
         log.info("Registering driver profile for userId: {}", userId);
 
@@ -38,9 +34,21 @@ public class DriverServiceImpl implements DriverService {
         }
 
         VehicleRequest vReq = request.getVehicle();
-        if (vehicleRepository.existsByLicensePlate(vReq.getLicensePlate())) {
+        if (driverRepository.existsByVehicleLicensePlate(vReq.getLicensePlate())) {
             throw new DuplicateResourceException("Vehicle license plate is already registered: " + vReq.getLicensePlate());
         }
+
+        Vehicle vehicle = Vehicle.builder()
+                .make(vReq.getMake())
+                .model(vReq.getModel())
+                .year(vReq.getYear())
+                .color(vReq.getColor())
+                .licensePlate(vReq.getLicensePlate())
+                .vehicleType(vReq.getVehicleType())
+                .seatingCapacity(vReq.getSeatingCapacity())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
 
         Driver driver = Driver.builder()
                 .userId(userId)
@@ -54,20 +62,10 @@ public class DriverServiceImpl implements DriverService {
                 .operationalStatus(OperationalStatus.ACTIVE)
                 .rating(5.0)
                 .totalTrips(0)
+                .vehicle(vehicle)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
-
-        Vehicle vehicle = Vehicle.builder()
-                .driver(driver)
-                .make(vReq.getMake())
-                .model(vReq.getModel())
-                .year(vReq.getYear())
-                .color(vReq.getColor())
-                .licensePlate(vReq.getLicensePlate())
-                .vehicleType(vReq.getVehicleType())
-                .seatingCapacity(vReq.getSeatingCapacity())
-                .build();
-
-        driver.setVehicle(vehicle);
 
         Driver savedDriver = driverRepository.save(driver);
         log.info("Successfully registered driver with ID: {}", savedDriver.getId());
@@ -75,7 +73,6 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public DriverResponse getDriverByUserId(String userId) {
         Driver driver = driverRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver profile not found for user: " + userId));
@@ -83,15 +80,13 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public DriverResponse getDriverById(Long id) {
+    public DriverResponse getDriverById(String id) {
         Driver driver = driverRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver not found with id: " + id));
         return DriverResponse.fromEntity(driver);
     }
 
     @Override
-    @Transactional
     public DriverResponse updateProfile(String userId, DriverUpdateRequest request) {
         Driver driver = driverRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver profile not found for user: " + userId));
@@ -111,6 +106,7 @@ public class DriverServiceImpl implements DriverService {
         if (request.getServiceRadiusKm() != null && request.getServiceRadiusKm() > 0) {
             driver.setServiceRadiusKm(request.getServiceRadiusKm());
         }
+        driver.setUpdatedAt(LocalDateTime.now());
 
         Driver updatedDriver = driverRepository.save(driver);
         log.info("Updated profile for driver ID: {}", updatedDriver.getId());
@@ -118,7 +114,6 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
-    @Transactional
     public DriverResponse updateVehicle(String userId, VehicleRequest request) {
         Driver driver = driverRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver profile not found for user: " + userId));
@@ -126,13 +121,12 @@ public class DriverServiceImpl implements DriverService {
         Vehicle vehicle = driver.getVehicle();
         if (vehicle == null) {
             vehicle = new Vehicle();
-            vehicle.setDriver(driver);
             driver.setVehicle(vehicle);
         }
 
-        // If license plate is changing, ensure uniqueness
-        if (!request.getLicensePlate().equalsIgnoreCase(vehicle.getLicensePlate())) {
-            if (vehicleRepository.existsByLicensePlate(request.getLicensePlate())) {
+        // If license plate is changing, ensure uniqueness across other drivers
+        if (vehicle.getLicensePlate() == null || !request.getLicensePlate().equalsIgnoreCase(vehicle.getLicensePlate())) {
+            if (driverRepository.existsByVehicleLicensePlate(request.getLicensePlate())) {
                 throw new DuplicateResourceException("Vehicle license plate is already registered: " + request.getLicensePlate());
             }
         }
@@ -144,26 +138,27 @@ public class DriverServiceImpl implements DriverService {
         vehicle.setLicensePlate(request.getLicensePlate());
         vehicle.setVehicleType(request.getVehicleType());
         vehicle.setSeatingCapacity(request.getSeatingCapacity());
+        vehicle.setUpdatedAt(LocalDateTime.now());
 
+        driver.setUpdatedAt(LocalDateTime.now());
         Driver savedDriver = driverRepository.save(driver);
         log.info("Updated vehicle for driver ID: {}", savedDriver.getId());
         return DriverResponse.fromEntity(savedDriver);
     }
 
     @Override
-    @Transactional
     public DriverResponse updateAvailability(String userId, DriverAvailabilityStatus status) {
         Driver driver = driverRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver profile not found for user: " + userId));
 
         driver.setAvailabilityStatus(status);
+        driver.setUpdatedAt(LocalDateTime.now());
         Driver savedDriver = driverRepository.save(driver);
         log.info("Updated availability status to {} for driver ID: {}", status, savedDriver.getId());
         return DriverResponse.fromEntity(savedDriver);
     }
 
     @Override
-    @Transactional
     public DriverResponse updateLocation(String userId, Double latitude, Double longitude) {
         Driver driver = driverRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver profile not found for user: " + userId));
@@ -171,6 +166,7 @@ public class DriverServiceImpl implements DriverService {
         driver.setCurrentLatitude(latitude);
         driver.setCurrentLongitude(longitude);
         driver.setLastLocationUpdate(LocalDateTime.now());
+        driver.setUpdatedAt(LocalDateTime.now());
 
         Driver savedDriver = driverRepository.save(driver);
         log.info("Updated simulated location for driver ID: {} to ({}, {})", savedDriver.getId(), latitude, longitude);
@@ -178,7 +174,6 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<EligibleDriverResponse> findEligibleDrivers(
             Double pickupLat,
             Double pickupLng,
@@ -214,26 +209,26 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
-    @Transactional
-    public DriverResponse updateInternalStatus(Long driverId, DriverAvailabilityStatus status) {
+    public DriverResponse updateInternalStatus(String driverId, DriverAvailabilityStatus status) {
         Driver driver = driverRepository.findById(driverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver not found with id: " + driverId));
 
         driver.setAvailabilityStatus(status);
+        driver.setUpdatedAt(LocalDateTime.now());
         Driver savedDriver = driverRepository.save(driver);
         log.info("Interservice updated availability status for driver ID {} to {}", driverId, status);
         return DriverResponse.fromEntity(savedDriver);
     }
 
     @Override
-    @Transactional
-    public DriverResponse updateInternalLocation(Long driverId, Double latitude, Double longitude) {
+    public DriverResponse updateInternalLocation(String driverId, Double latitude, Double longitude) {
         Driver driver = driverRepository.findById(driverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver not found with id: " + driverId));
 
         driver.setCurrentLatitude(latitude);
         driver.setCurrentLongitude(longitude);
         driver.setLastLocationUpdate(LocalDateTime.now());
+        driver.setUpdatedAt(LocalDateTime.now());
 
         Driver savedDriver = driverRepository.save(driver);
         log.info("Interservice updated location for driver ID {} to ({}, {})", driverId, latitude, longitude);

@@ -7,7 +7,6 @@ import lk.sliit.ridelink.driver.dto.VehicleRequest;
 import lk.sliit.ridelink.driver.entity.*;
 import lk.sliit.ridelink.driver.exception.DuplicateResourceException;
 import lk.sliit.ridelink.driver.repository.DriverRepository;
-import lk.sliit.ridelink.driver.repository.VehicleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,9 +29,6 @@ class DriverServiceTest {
     @Mock
     private DriverRepository driverRepository;
 
-    @Mock
-    private VehicleRepository vehicleRepository;
-
     @InjectMocks
     private DriverServiceImpl driverService;
 
@@ -43,7 +39,6 @@ class DriverServiceTest {
     @BeforeEach
     void setUp() {
         mockVehicle = Vehicle.builder()
-                .id(1L)
                 .make("Toyota")
                 .model("Aqua")
                 .year(2018)
@@ -54,7 +49,7 @@ class DriverServiceTest {
                 .build();
 
         mockDriver = Driver.builder()
-                .id(1L)
+                .id("driver-doc-100")
                 .userId("driver-usr-100")
                 .fullName("Sunil Perera")
                 .email("sunil@example.com")
@@ -72,8 +67,6 @@ class DriverServiceTest {
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
-
-        mockVehicle.setDriver(mockDriver);
 
         VehicleRequest vReq = VehicleRequest.builder()
                 .make("Toyota")
@@ -101,7 +94,7 @@ class DriverServiceTest {
     void shouldRegisterDriverSuccessfully() {
         when(driverRepository.existsByUserId("driver-usr-100")).thenReturn(false);
         when(driverRepository.existsByLicenseNumber("DL-987654")).thenReturn(false);
-        when(vehicleRepository.existsByLicensePlate("WP CAX-1234")).thenReturn(false);
+        when(driverRepository.existsByVehicleLicensePlate("WP CAX-1234")).thenReturn(false);
         when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
 
         DriverResponse response = driverService.registerDriver("driver-usr-100", regRequest);
@@ -129,7 +122,7 @@ class DriverServiceTest {
         when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
         when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
 
-        DriverResponse response = driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.OFFLINE);
+        driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.OFFLINE);
 
         assertEquals(DriverAvailabilityStatus.OFFLINE, mockDriver.getAvailabilityStatus());
         verify(driverRepository, times(1)).save(mockDriver);
@@ -153,7 +146,7 @@ class DriverServiceTest {
     @DisplayName("Should retrieve nearest eligible available drivers within radius")
     void shouldFindEligibleDriversWithinRadius() {
         Driver nearbyDriver = Driver.builder()
-                .id(2L)
+                .id("driver-doc-200")
                 .userId("driver-usr-200")
                 .fullName("Kamal Silva")
                 .phoneNumber("+94779876543")
@@ -165,7 +158,6 @@ class DriverServiceTest {
                 .rating(4.8)
                 .totalTrips(15)
                 .vehicle(Vehicle.builder()
-                        .id(2L)
                         .make("Nissan")
                         .model("Leaf")
                         .vehicleType(VehicleType.CAR)
@@ -175,7 +167,7 @@ class DriverServiceTest {
                 .build();
 
         Driver farDriver = Driver.builder()
-                .id(3L)
+                .id("driver-doc-300")
                 .userId("driver-usr-300")
                 .fullName("Far Away Driver")
                 .licenseNumber("DL-999999")
