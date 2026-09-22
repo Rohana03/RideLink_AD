@@ -1,0 +1,530 @@
+package lk.sliit.ridelink.driver.service;
+
+import lk.sliit.ridelink.driver.dto.DriverRegistrationRequest;
+import lk.sliit.ridelink.driver.dto.DriverResponse;
+import lk.sliit.ridelink.driver.dto.EligibleDriverResponse;
+import lk.sliit.ridelink.driver.dto.VehicleRequest;
+import lk.sliit.ridelink.driver.entity.*;
+import lk.sliit.ridelink.driver.exception.BadRequestException;
+import lk.sliit.ridelink.driver.exception.DuplicateResourceException;
+import lk.sliit.ridelink.driver.exception.InvalidStatusTransitionException;
+import lk.sliit.ridelink.driver.exception.ResourceNotFoundException;
+import lk.sliit.ridelink.driver.repository.DriverRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class DriverServiceTest {
+
+    @Mock
+    private DriverRepository driverRepository;
+
+    @InjectMocks
+    private DriverServiceImpl driverService;
+
+    private Driver mockDriver;
+    private Vehicle mockVehicle;
+    private DriverRegistrationRequest regRequest;
+
+    @BeforeEach
+    void setUp() {
+        mockVehicle = Vehicle.builder()
+                .make("Toyota")
+                .model("Aqua")
+                .year(2018)
+                .color("Silver")
+                .licensePlate("WP CAX-1234")
+                .vehicleType(VehicleType.CAR)
+                .seatingCapacity(4)
+                .build();
+
+        mockDriver = Driver.builder()
+                .id("driver-doc-100")
+                .userId("driver-usr-100")
+                .fullName("Sunil Perera")
+                .email("sunil@example.com")
+                .phoneNumber("+94771234567")
+                .licenseNumber("DL-987654")
+                .serviceArea("Colombo")
+                .serviceRadiusKm(15.0)
+                .currentLatitude(6.9271)
+                .currentLongitude(79.8612)
+                .availabilityStatus(DriverAvailabilityStatus.AVAILABLE)
+                .operationalStatus(OperationalStatus.ACTIVE)
+                .rating(4.9)
+                .totalTrips(42)
+                .vehicle(mockVehicle)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        VehicleRequest vReq = VehicleRequest.builder()
+                .make("Toyota")
+                .model("Aqua")
+                .year(2018)
+                .color("Silver")
+                .licensePlate("WP CAX-1234")
+                .vehicleType(VehicleType.CAR)
+                .seatingCapacity(4)
+                .build();
+
+        regRequest = DriverRegistrationRequest.builder()
+                .fullName("Sunil Perera")
+                .email("sunil@example.com")
+                .phoneNumber("+94771234567")
+                .licenseNumber("DL-987654")
+                .serviceArea("Colombo")
+                .serviceRadiusKm(15.0)
+                .vehicle(vReq)
+                .build();
+    }
+
+    @Test
+    @DisplayName("Should successfully register a new driver with vehicle")
+    void shouldRegisterDriverSuccessfully() {
+        when(driverRepository.existsByUserId("driver-usr-100")).thenReturn(false);
+        when(driverRepository.existsByLicenseNumber("DL-987654")).thenReturn(false);
+        when(driverRepository.existsByVehicleLicensePlate("WP CAX-1234")).thenReturn(false);
+        when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+        DriverResponse response = driverService.registerDriver("driver-usr-100", regRequest);
+
+        assertNotNull(response);
+        assertEquals("Sunil Perera", response.getFullName());
+        assertEquals("WP CAX-1234", response.getVehicle().getLicensePlate());
+        assertEquals(DriverAvailabilityStatus.AVAILABLE, response.getAvailabilityStatus());
+        verify(driverRepository, times(1)).save(any(Driver.class));
+    }
+
+    @Test
+    @DisplayName("Should throw DuplicateResourceException if user already has a driver profile")
+    void shouldThrowWhenUserIdAlreadyExists() {
+        when(driverRepository.existsByUserId("driver-usr-100")).thenReturn(true);
+
+        assertThrows(DuplicateResourceException.class, () ->
+                driverService.registerDriver("driver-usr-100", regRequest));
+        verify(driverRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should update driver availability status")
+    void shouldUpdateAvailabilityStatus() {
+        when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+        when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+        driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.OFFLINE);
+
+        assertEquals(DriverAvailabilityStatus.OFFLINE, mockDriver.getAvailabilityStatus());
+        verify(driverRepository, times(1)).save(mockDriver);
+    }
+
+    @Test
+    @DisplayName("Should update simulated GPS location")
+    void shouldUpdateSimulatedLocation() {
+        when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+        when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+        driverService.updateLocation("driver-usr-100", 6.9000, 79.8500);
+
+        assertEquals(6.9000, mockDriver.getCurrentLatitude());
+        assertEquals(79.8500, mockDriver.getCurrentLongitude());
+        assertNotNull(mockDriver.getLastLocationUpdate());
+        verify(driverRepository, times(1)).save(mockDriver);
+    }
+
+    @Test
+    @DisplayName("Should retrieve nearest eligible available drivers within radius")
+    void shouldFindEligibleDriversWithinRadius() {
+        Driver nearbyDriver = Driver.builder()
+                .id("driver-doc-200")
+                .userId("driver-usr-200")
+                .fullName("Kamal Silva")
+                .phoneNumber("+94779876543")
+                .licenseNumber("DL-112233")
+                .currentLatitude(6.9300)
+                .currentLongitude(79.8550)
+                .availabilityStatus(DriverAvailabilityStatus.AVAILABLE)
+                .operationalStatus(OperationalStatus.ACTIVE)
+                .rating(4.8)
+                .totalTrips(15)
+                .vehicle(Vehicle.builder()
+                        .make("Nissan")
+                        .model("Leaf")
+                        .vehicleType(VehicleType.CAR)
+                        .licensePlate("WP CAD-5678")
+                        .seatingCapacity(4)
+                        .build())
+                .build();
+
+        Driver farDriver = Driver.builder()
+                .id("driver-doc-300")
+                .userId("driver-usr-300")
+                .fullName("Far Away Driver")
+                .licenseNumber("DL-999999")
+                .currentLatitude(7.2906) // Kandy ~100 km away
+                .currentLongitude(80.6337)
+                .availabilityStatus(DriverAvailabilityStatus.AVAILABLE)
+                .operationalStatus(OperationalStatus.ACTIVE)
+                .rating(5.0)
+                .vehicle(mockVehicle)
+                .build();
+
+        when(driverRepository.findAvailableActiveDriversWithLocation(
+                DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                .thenReturn(List.of(mockDriver, nearbyDriver, farDriver));
+
+        // Search near Colombo Fort (6.9344, 79.8428) with radius 5 km
+        List<EligibleDriverResponse> eligibleDrivers = driverService.findEligibleDrivers(
+                6.9344, 79.8428, VehicleType.CAR, 5.0, 10);
+
+        assertNotNull(eligibleDrivers);
+        assertEquals(2, eligibleDrivers.size(), "Should exclude far driver (>5 km)");
+        assertTrue(eligibleDrivers.get(0).getDistanceKm() <= eligibleDrivers.get(1).getDistanceKm(),
+                "Drivers must be sorted ascending by distance");
+    }
+
+    // ---------------------------------------------------------------------
+    // Registration and vehicle failures
+    // ---------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Should reject registration when the driver license number is already used")
+    void shouldThrowWhenLicenseNumberAlreadyExists() {
+        when(driverRepository.existsByUserId("driver-usr-100")).thenReturn(false);
+        when(driverRepository.existsByLicenseNumber("DL-987654")).thenReturn(true);
+
+        assertThrows(DuplicateResourceException.class, () ->
+                driverService.registerDriver("driver-usr-100", regRequest));
+        verify(driverRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should treat license plates case-insensitively when checking for duplicates")
+    void shouldThrowWhenLicensePlateAlreadyExistsInDifferentCase() {
+        regRequest.getVehicle().setLicensePlate("  wp cax-1234 ");
+        when(driverRepository.existsByUserId("driver-usr-100")).thenReturn(false);
+        when(driverRepository.existsByLicenseNumber("DL-987654")).thenReturn(false);
+        when(driverRepository.existsByVehicleLicensePlate("WP CAX-1234")).thenReturn(true);
+
+        assertThrows(DuplicateResourceException.class, () ->
+                driverService.registerDriver("driver-usr-100", regRequest));
+        verify(driverRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should register new drivers as OFFLINE and ACTIVE with an upper-case plate")
+    void shouldSaveNewDriverWithSafeDefaults() {
+        regRequest.getVehicle().setLicensePlate("wp cax-1234");
+        when(driverRepository.existsByUserId("driver-usr-100")).thenReturn(false);
+        when(driverRepository.existsByLicenseNumber("DL-987654")).thenReturn(false);
+        when(driverRepository.existsByVehicleLicensePlate("WP CAX-1234")).thenReturn(false);
+        when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+        driverService.registerDriver("driver-usr-100", regRequest);
+
+        ArgumentCaptor<Driver> saved = ArgumentCaptor.forClass(Driver.class);
+        verify(driverRepository).save(saved.capture());
+        assertEquals(DriverAvailabilityStatus.OFFLINE, saved.getValue().getAvailabilityStatus());
+        assertEquals(OperationalStatus.ACTIVE, saved.getValue().getOperationalStatus());
+        assertEquals("WP CAX-1234", saved.getValue().getVehicle().getLicensePlate());
+    }
+
+    @Test
+    @DisplayName("Should throw ResourceNotFoundException for an unknown driver ID")
+    void shouldThrowWhenDriverIdNotFound() {
+        when(driverRepository.findById("missing-id")).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> driverService.getDriverById("missing-id"));
+    }
+
+    @Test
+    @DisplayName("Should allow re-saving the driver's own plate in a different case")
+    void shouldAllowUpdatingVehicleWithOwnPlate() {
+        VehicleRequest update = VehicleRequest.builder()
+                .make("Toyota").model("Aqua").year(2019).color("Blue")
+                .licensePlate("wp cax-1234")
+                .vehicleType(VehicleType.CAR).seatingCapacity(4)
+                .build();
+        when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+        when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+        driverService.updateVehicle("driver-usr-100", update);
+
+        assertEquals("Blue", mockDriver.getVehicle().getColor());
+        verify(driverRepository, never()).existsByVehicleLicensePlate(any());
+    }
+
+    @Test
+    @DisplayName("Should reject a vehicle update that uses another driver's plate")
+    void shouldThrowWhenUpdatingVehicleToTakenPlate() {
+        VehicleRequest update = VehicleRequest.builder()
+                .make("Nissan").model("Leaf").year(2020).color("White")
+                .licensePlate("WP CAD-5678")
+                .vehicleType(VehicleType.CAR).seatingCapacity(4)
+                .build();
+        when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+        when(driverRepository.existsByVehicleLicensePlate("WP CAD-5678")).thenReturn(true);
+
+        assertThrows(DuplicateResourceException.class, () ->
+                driverService.updateVehicle("driver-usr-100", update));
+        verify(driverRepository, never()).save(any());
+    }
+
+    // ---------------------------------------------------------------------
+    // Driver-controlled availability rules
+    // ---------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Driver availability rules")
+    class DriverAvailabilityRules {
+
+        @Test
+        @DisplayName("Should reject a driver setting themselves ON_TRIP (400)")
+        void shouldRejectDriverSettingOnTrip() {
+            assertThrows(BadRequestException.class, () ->
+                    driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.ON_TRIP));
+            verify(driverRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should reject going OFFLINE while on a trip (409)")
+        void shouldRejectGoingOfflineWhileOnTrip() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.ON_TRIP);
+            when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(InvalidStatusTransitionException.class, () ->
+                    driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.OFFLINE));
+            assertEquals(DriverAvailabilityStatus.ON_TRIP, mockDriver.getAvailabilityStatus());
+            verify(driverRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should reject a SUSPENDED driver going AVAILABLE (409)")
+        void shouldRejectSuspendedDriverGoingAvailable() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.OFFLINE);
+            mockDriver.setOperationalStatus(OperationalStatus.SUSPENDED);
+            when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(InvalidStatusTransitionException.class, () ->
+                    driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.AVAILABLE));
+            verify(driverRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should let an ACTIVE, OFFLINE driver go AVAILABLE")
+        void shouldAllowOfflineDriverToGoAvailable() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.OFFLINE);
+            when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+            when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+            driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.AVAILABLE);
+
+            assertEquals(DriverAvailabilityStatus.AVAILABLE, mockDriver.getAvailabilityStatus());
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Interservice (Ride Management) status transitions
+    // ---------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Internal status transitions")
+    class InternalStatusTransitions {
+
+        @Test
+        @DisplayName("AVAILABLE -> ON_TRIP succeeds when a ride is assigned")
+        void shouldAssignAvailableDriver() {
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+            when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+            driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.ON_TRIP);
+
+            assertEquals(DriverAvailabilityStatus.ON_TRIP, mockDriver.getAvailabilityStatus());
+        }
+
+        @Test
+        @DisplayName("ON_TRIP -> ON_TRIP is rejected so a driver cannot take two rides (409)")
+        void shouldRejectDoubleAssignment() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.ON_TRIP);
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(InvalidStatusTransitionException.class, () ->
+                    driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.ON_TRIP));
+            verify(driverRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("OFFLINE -> ON_TRIP is rejected (409)")
+        void shouldRejectAssigningOfflineDriver() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.OFFLINE);
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(InvalidStatusTransitionException.class, () ->
+                    driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.ON_TRIP));
+        }
+
+        @Test
+        @DisplayName("ON_TRIP -> AVAILABLE succeeds when a ride completes or is cancelled")
+        void shouldReleaseDriverAfterTrip() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.ON_TRIP);
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+            when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+            driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.AVAILABLE);
+
+            assertEquals(DriverAvailabilityStatus.AVAILABLE, mockDriver.getAvailabilityStatus());
+        }
+
+        @Test
+        @DisplayName("OFFLINE -> AVAILABLE through the internal API is rejected (409)")
+        void shouldRejectReleasingOfflineDriver() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.OFFLINE);
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(InvalidStatusTransitionException.class, () ->
+                    driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.AVAILABLE));
+        }
+
+        @Test
+        @DisplayName("Internal API cannot set OFFLINE (400)")
+        void shouldRejectUnsupportedInternalStatus() {
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(BadRequestException.class, () ->
+                    driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.OFFLINE));
+            verify(driverRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Unknown driver ID returns ResourceNotFoundException")
+        void shouldThrowForUnknownDriver() {
+            when(driverRepository.findById("missing-id")).thenReturn(Optional.empty());
+
+            assertThrows(ResourceNotFoundException.class, () ->
+                    driverService.updateInternalStatus("missing-id", DriverAvailabilityStatus.ON_TRIP));
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Eligible driver search: failure and boundary cases
+    // ---------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Eligible driver search")
+    class EligibleDriverSearch {
+
+        @Test
+        @DisplayName("Returns an empty list when no driver is available")
+        void shouldReturnEmptyWhenNoDriversAvailable() {
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of());
+
+            List<EligibleDriverResponse> result = driverService.findEligibleDrivers(
+                    6.9344, 79.8428, null, 5.0, 5);
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Excludes drivers whose vehicle type does not match")
+        void shouldFilterByVehicleType() {
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of(mockDriver)); // mockDriver drives a CAR
+
+            List<EligibleDriverResponse> result = driverService.findEligibleDrivers(
+                    6.9271, 79.8612, VehicleType.BIKE, 5.0, 5);
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Excludes drivers without a registered vehicle")
+        void shouldSkipDriversWithoutVehicle() {
+            mockDriver.setVehicle(null);
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of(mockDriver));
+
+            assertTrue(driverService.findEligibleDrivers(6.9271, 79.8612, null, 5.0, 5).isEmpty());
+        }
+
+        @Test
+        @DisplayName("Includes a driver standing exactly at the pickup point (distance 0)")
+        void shouldIncludeDriverAtPickupPoint() {
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of(mockDriver));
+
+            List<EligibleDriverResponse> result = driverService.findEligibleDrivers(
+                    6.9271, 79.8612, VehicleType.CAR, 0.001, 5);
+
+            assertEquals(1, result.size());
+            assertEquals(0.0, result.get(0).getDistanceKm(), 0.0001);
+        }
+
+        @Test
+        @DisplayName("Falls back to a 5 km radius and 5 results when given invalid values")
+        void shouldUseDefaultsForInvalidRadiusAndLimit() {
+            Driver sixKmAway = Driver.builder()
+                    .id("driver-doc-400")
+                    .userId("driver-usr-400")
+                    .fullName("Six Km Driver")
+                    .currentLatitude(6.9271 + 0.054) // ~6 km north
+                    .currentLongitude(79.8612)
+                    .availabilityStatus(DriverAvailabilityStatus.AVAILABLE)
+                    .operationalStatus(OperationalStatus.ACTIVE)
+                    .vehicle(mockVehicle)
+                    .build();
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of(mockDriver, sixKmAway));
+
+            List<EligibleDriverResponse> result = driverService.findEligibleDrivers(
+                    6.9271, 79.8612, null, -1.0, 0);
+
+            assertEquals(1, result.size(), "6 km driver is outside the default 5 km radius");
+            assertEquals("driver-doc-100", result.get(0).getDriverId());
+        }
+
+        @Test
+        @DisplayName("Returns only the nearest drivers when the limit is smaller than the matches")
+        void shouldRespectLimit() {
+            Driver secondDriver = Driver.builder()
+                    .id("driver-doc-500")
+                    .userId("driver-usr-500")
+                    .fullName("Second Driver")
+                    .currentLatitude(6.9300)
+                    .currentLongitude(79.8612)
+                    .availabilityStatus(DriverAvailabilityStatus.AVAILABLE)
+                    .operationalStatus(OperationalStatus.ACTIVE)
+                    .vehicle(mockVehicle)
+                    .build();
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of(secondDriver, mockDriver));
+
+            List<EligibleDriverResponse> result = driverService.findEligibleDrivers(
+                    6.9271, 79.8612, null, 5.0, 1);
+
+            assertEquals(1, result.size());
+            assertEquals("driver-doc-100", result.get(0).getDriverId(), "Nearest driver must be returned first");
+        }
+    }
+}

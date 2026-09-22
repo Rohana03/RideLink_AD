@@ -1,0 +1,12 @@
+# Test-only values. These are dummy keys used by the WebMvc tests and are not
+# used by any running environment.
+spring:
+  application:
+    name: driver-vehicle-service-test
+
+ridelink:
+  jwt:
+    secret: test-only-jwt-secret-key-not-used-outside-unit-tests-0123456789
+    expiration-ms: 3600000
+  internal:
+    api-key: ridelink-internal-service-key-change-me

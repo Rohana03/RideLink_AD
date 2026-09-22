@@ -4,20 +4,18 @@ server:
 spring:
   application:
     name: driver-vehicle-service
-  datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:driver_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:root}
-  jpa:
-    hibernate:
-      ddl-auto: update
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://${DB_HOST:localhost}:${DB_PORT:27017}/${DB_NAME:driver_db}}
+      auto-index-creation: true
 
 ridelink:
   jwt:
-    secret: ${JWT_SECRET:ridelink-shared-secret-key-for-it3130-group-assignment-change-me}
+    # No default: must come from the JWT_SECRET env var (or a local, git-ignored application-dev.yml)
+    secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:3600000}
   internal:
-    api-key: ${INTERNAL_API_KEY:ridelink-internal-service-key-change-me}
+    api-key: ${INTERNAL_API_KEY}
 
 springdoc:
   swagger-ui:
