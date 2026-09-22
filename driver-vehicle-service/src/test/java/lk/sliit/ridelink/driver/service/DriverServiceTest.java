@@ -203,6 +203,17 @@ class DriverServiceTest {
     // ---------------------------------------------------------------------
 
     @Test
+    @DisplayName("Should reject registration when the driver license number is already used")
+    void shouldThrowWhenLicenseNumberAlreadyExists() {
+        when(driverRepository.existsByUserId("driver-usr-100")).thenReturn(false);
+        when(driverRepository.existsByLicenseNumber("DL-987654")).thenReturn(true);
+
+        assertThrows(DuplicateResourceException.class, () ->
+                driverService.registerDriver("driver-usr-100", regRequest));
+        verify(driverRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Should treat license plates case-insensitively when checking for duplicates")
     void shouldThrowWhenLicensePlateAlreadyExistsInDifferentCase() {
         regRequest.getVehicle().setLicensePlate("  wp cax-1234 ");
@@ -231,6 +242,14 @@ class DriverServiceTest {
         assertEquals(DriverAvailabilityStatus.OFFLINE, saved.getValue().getAvailabilityStatus());
         assertEquals(OperationalStatus.ACTIVE, saved.getValue().getOperationalStatus());
         assertEquals("WP CAX-1234", saved.getValue().getVehicle().getLicensePlate());
+    }
+
+    @Test
+    @DisplayName("Should throw ResourceNotFoundException for an unknown driver ID")
+    void shouldThrowWhenDriverIdNotFound() {
+        when(driverRepository.findById("missing-id")).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> driverService.getDriverById("missing-id"));
     }
 
     @Test
@@ -398,6 +417,114 @@ class DriverServiceTest {
 
             assertThrows(ResourceNotFoundException.class, () ->
                     driverService.updateInternalStatus("missing-id", DriverAvailabilityStatus.ON_TRIP));
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Eligible driver search: failure and boundary cases
+    // ---------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Eligible driver search")
+    class EligibleDriverSearch {
+
+        @Test
+        @DisplayName("Returns an empty list when no driver is available")
+        void shouldReturnEmptyWhenNoDriversAvailable() {
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of());
+
+            List<EligibleDriverResponse> result = driverService.findEligibleDrivers(
+                    6.9344, 79.8428, null, 5.0, 5);
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Excludes drivers whose vehicle type does not match")
+        void shouldFilterByVehicleType() {
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of(mockDriver)); // mockDriver drives a CAR
+
+            List<EligibleDriverResponse> result = driverService.findEligibleDrivers(
+                    6.9271, 79.8612, VehicleType.BIKE, 5.0, 5);
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Excludes drivers without a registered vehicle")
+        void shouldSkipDriversWithoutVehicle() {
+            mockDriver.setVehicle(null);
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of(mockDriver));
+
+            assertTrue(driverService.findEligibleDrivers(6.9271, 79.8612, null, 5.0, 5).isEmpty());
+        }
+
+        @Test
+        @DisplayName("Includes a driver standing exactly at the pickup point (distance 0)")
+        void shouldIncludeDriverAtPickupPoint() {
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of(mockDriver));
+
+            List<EligibleDriverResponse> result = driverService.findEligibleDrivers(
+                    6.9271, 79.8612, VehicleType.CAR, 0.001, 5);
+
+            assertEquals(1, result.size());
+            assertEquals(0.0, result.get(0).getDistanceKm(), 0.0001);
+        }
+
+        @Test
+        @DisplayName("Falls back to a 5 km radius and 5 results when given invalid values")
+        void shouldUseDefaultsForInvalidRadiusAndLimit() {
+            Driver sixKmAway = Driver.builder()
+                    .id("driver-doc-400")
+                    .userId("driver-usr-400")
+                    .fullName("Six Km Driver")
+                    .currentLatitude(6.9271 + 0.054) // ~6 km north
+                    .currentLongitude(79.8612)
+                    .availabilityStatus(DriverAvailabilityStatus.AVAILABLE)
+                    .operationalStatus(OperationalStatus.ACTIVE)
+                    .vehicle(mockVehicle)
+                    .build();
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of(mockDriver, sixKmAway));
+
+            List<EligibleDriverResponse> result = driverService.findEligibleDrivers(
+                    6.9271, 79.8612, null, -1.0, 0);
+
+            assertEquals(1, result.size(), "6 km driver is outside the default 5 km radius");
+            assertEquals("driver-doc-100", result.get(0).getDriverId());
+        }
+
+        @Test
+        @DisplayName("Returns only the nearest drivers when the limit is smaller than the matches")
+        void shouldRespectLimit() {
+            Driver secondDriver = Driver.builder()
+                    .id("driver-doc-500")
+                    .userId("driver-usr-500")
+                    .fullName("Second Driver")
+                    .currentLatitude(6.9300)
+                    .currentLongitude(79.8612)
+                    .availabilityStatus(DriverAvailabilityStatus.AVAILABLE)
+                    .operationalStatus(OperationalStatus.ACTIVE)
+                    .vehicle(mockVehicle)
+                    .build();
+            when(driverRepository.findAvailableActiveDriversWithLocation(
+                    DriverAvailabilityStatus.AVAILABLE, OperationalStatus.ACTIVE))
+                    .thenReturn(List.of(secondDriver, mockDriver));
+
+            List<EligibleDriverResponse> result = driverService.findEligibleDrivers(
+                    6.9271, 79.8612, null, 5.0, 1);
+
+            assertEquals(1, result.size());
+            assertEquals("driver-doc-100", result.get(0).getDriverId(), "Nearest driver must be returned first");
         }
     }
 }
