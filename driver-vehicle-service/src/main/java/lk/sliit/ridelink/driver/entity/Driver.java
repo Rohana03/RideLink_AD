@@ -4,12 +4,14 @@ import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
 @Document(collection = "drivers")
+@CompoundIndex(name = "vehicle_license_plate_unique", def = "{'vehicle.licensePlate': 1}", unique = true, sparse = true)
 @Getter
 @Setter
 @NoArgsConstructor
