@@ -11,6 +11,7 @@ import lk.sliit.ridelink.driver.dto.InternalStatusUpdateRequest;
 import lk.sliit.ridelink.driver.dto.VehicleResponse;
 import lk.sliit.ridelink.driver.entity.DriverAvailabilityStatus;
 import lk.sliit.ridelink.driver.entity.VehicleType;
+import lk.sliit.ridelink.driver.exception.InvalidStatusTransitionException;
 import lk.sliit.ridelink.driver.service.DriverService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -127,5 +128,24 @@ class InternalDriverControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.availabilityStatus").value("ON_TRIP"));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/drivers/internal/{id}/status on a busy driver returns 409 Conflict")
+    void shouldReturnConflictWhenDriverAlreadyOnTrip() throws Exception {
+        InternalStatusUpdateRequest request = InternalStatusUpdateRequest.builder()
+                .status(DriverAvailabilityStatus.ON_TRIP)
+                .build();
+
+        when(driverService.updateInternalStatus(eq("driver-doc-101"), eq(DriverAvailabilityStatus.ON_TRIP)))
+                .thenThrow(new InvalidStatusTransitionException(
+                        "Driver driver-doc-101 is ON_TRIP and cannot be assigned a ride"));
+
+        mockMvc.perform(patch("/api/drivers/internal/driver-doc-101/status")
+                        .header("X-Internal-Api-Key", VALID_API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Driver driver-doc-101 is ON_TRIP and cannot be assigned a ride"));
     }
 }
