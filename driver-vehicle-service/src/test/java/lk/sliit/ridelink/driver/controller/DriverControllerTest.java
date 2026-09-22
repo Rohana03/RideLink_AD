@@ -25,6 +25,8 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -172,9 +174,60 @@ class DriverControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/drivers/me without token should return 401/403")
+    @DisplayName("GET /api/drivers/me without token returns 401 with JSON error body")
     void shouldDenyAccessWithoutToken() throws Exception {
         mockMvc.perform(get("/api/drivers/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.path").value("/api/drivers/me"));
+    }
+
+    @Test
+    @DisplayName("POST /api/drivers with a PASSENGER token returns 403 Forbidden")
+    void shouldForbidPassengerFromRegisteringAsDriver() throws Exception {
+        mockPassengerToken();
+
+        mockMvc.perform(post("/api/drivers")
+                        .header("Authorization", "Bearer " + PASSENGER_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+
+        verify(driverService, never()).registerDriver(any(), any());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/drivers/me/availability with a PASSENGER token returns 403 Forbidden")
+    void shouldForbidPassengerFromChangingAvailability() throws Exception {
+        mockPassengerToken();
+
+        mockMvc.perform(patch("/api/drivers/me/availability")
+                        .header("Authorization", "Bearer " + PASSENGER_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"availabilityStatus\":\"AVAILABLE\"}"))
                 .andExpect(status().isForbidden());
+
+        verify(driverService, never()).updateAvailability(any(), any());
+    }
+
+    @Test
+    @DisplayName("GET /api/drivers/{id} is allowed for a PASSENGER (view assigned driver)")
+    void shouldAllowPassengerToViewDriverById() throws Exception {
+        mockPassengerToken();
+        when(driverService.getDriverById("driver-doc-101")).thenReturn(mockDriverResponse);
+
+        mockMvc.perform(get("/api/drivers/driver-doc-101")
+                        .header("Authorization", "Bearer " + PASSENGER_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value("user-drv-101"));
+    }
+
+    private static final String PASSENGER_TOKEN = "mock.passenger.token";
+
+    private void mockPassengerToken() {
+        when(jwtUtil.isTokenValid(PASSENGER_TOKEN)).thenReturn(true);
+        when(jwtUtil.extractUserId(PASSENGER_TOKEN)).thenReturn("user-pax-201");
+        when(jwtUtil.extractRoles(PASSENGER_TOKEN)).thenReturn(List.of("PASSENGER"));
     }
 }
