@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -191,5 +192,73 @@ class DriverServiceTest {
         assertEquals(2, eligibleDrivers.size(), "Should exclude far driver (>5 km)");
         assertTrue(eligibleDrivers.get(0).getDistanceKm() <= eligibleDrivers.get(1).getDistanceKm(),
                 "Drivers must be sorted ascending by distance");
+    }
+
+    // ---------------------------------------------------------------------
+    // Registration and vehicle failures
+    // ---------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Should treat license plates case-insensitively when checking for duplicates")
+    void shouldThrowWhenLicensePlateAlreadyExistsInDifferentCase() {
+        regRequest.getVehicle().setLicensePlate("  wp cax-1234 ");
+        when(driverRepository.existsByUserId("driver-usr-100")).thenReturn(false);
+        when(driverRepository.existsByLicenseNumber("DL-987654")).thenReturn(false);
+        when(driverRepository.existsByVehicleLicensePlate("WP CAX-1234")).thenReturn(true);
+
+        assertThrows(DuplicateResourceException.class, () ->
+                driverService.registerDriver("driver-usr-100", regRequest));
+        verify(driverRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should register new drivers as OFFLINE and ACTIVE with an upper-case plate")
+    void shouldSaveNewDriverWithSafeDefaults() {
+        regRequest.getVehicle().setLicensePlate("wp cax-1234");
+        when(driverRepository.existsByUserId("driver-usr-100")).thenReturn(false);
+        when(driverRepository.existsByLicenseNumber("DL-987654")).thenReturn(false);
+        when(driverRepository.existsByVehicleLicensePlate("WP CAX-1234")).thenReturn(false);
+        when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+        driverService.registerDriver("driver-usr-100", regRequest);
+
+        ArgumentCaptor<Driver> saved = ArgumentCaptor.forClass(Driver.class);
+        verify(driverRepository).save(saved.capture());
+        assertEquals(DriverAvailabilityStatus.OFFLINE, saved.getValue().getAvailabilityStatus());
+        assertEquals(OperationalStatus.ACTIVE, saved.getValue().getOperationalStatus());
+        assertEquals("WP CAX-1234", saved.getValue().getVehicle().getLicensePlate());
+    }
+
+    @Test
+    @DisplayName("Should allow re-saving the driver's own plate in a different case")
+    void shouldAllowUpdatingVehicleWithOwnPlate() {
+        VehicleRequest update = VehicleRequest.builder()
+                .make("Toyota").model("Aqua").year(2019).color("Blue")
+                .licensePlate("wp cax-1234")
+                .vehicleType(VehicleType.CAR).seatingCapacity(4)
+                .build();
+        when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+        when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+        driverService.updateVehicle("driver-usr-100", update);
+
+        assertEquals("Blue", mockDriver.getVehicle().getColor());
+        verify(driverRepository, never()).existsByVehicleLicensePlate(any());
+    }
+
+    @Test
+    @DisplayName("Should reject a vehicle update that uses another driver's plate")
+    void shouldThrowWhenUpdatingVehicleToTakenPlate() {
+        VehicleRequest update = VehicleRequest.builder()
+                .make("Nissan").model("Leaf").year(2020).color("White")
+                .licensePlate("WP CAD-5678")
+                .vehicleType(VehicleType.CAR).seatingCapacity(4)
+                .build();
+        when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+        when(driverRepository.existsByVehicleLicensePlate("WP CAD-5678")).thenReturn(true);
+
+        assertThrows(DuplicateResourceException.class, () ->
+                driverService.updateVehicle("driver-usr-100", update));
+        verify(driverRepository, never()).save(any());
     }
 }

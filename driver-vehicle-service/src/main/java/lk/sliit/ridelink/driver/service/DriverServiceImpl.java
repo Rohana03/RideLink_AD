@@ -34,8 +34,9 @@ public class DriverServiceImpl implements DriverService {
         }
 
         VehicleRequest vReq = request.getVehicle();
-        if (driverRepository.existsByVehicleLicensePlate(vReq.getLicensePlate())) {
-            throw new DuplicateResourceException("Vehicle license plate is already registered: " + vReq.getLicensePlate());
+        String licensePlate = normalizePlate(vReq.getLicensePlate());
+        if (driverRepository.existsByVehicleLicensePlate(licensePlate)) {
+            throw new DuplicateResourceException("Vehicle license plate is already registered: " + licensePlate);
         }
 
         Vehicle vehicle = Vehicle.builder()
@@ -43,7 +44,7 @@ public class DriverServiceImpl implements DriverService {
                 .model(vReq.getModel())
                 .year(vReq.getYear())
                 .color(vReq.getColor())
-                .licensePlate(vReq.getLicensePlate())
+                .licensePlate(licensePlate)
                 .vehicleType(vReq.getVehicleType())
                 .seatingCapacity(vReq.getSeatingCapacity())
                 .createdAt(LocalDateTime.now())
@@ -125,17 +126,17 @@ public class DriverServiceImpl implements DriverService {
         }
 
         // If license plate is changing, ensure uniqueness across other drivers
-        if (vehicle.getLicensePlate() == null || !request.getLicensePlate().equalsIgnoreCase(vehicle.getLicensePlate())) {
-            if (driverRepository.existsByVehicleLicensePlate(request.getLicensePlate())) {
-                throw new DuplicateResourceException("Vehicle license plate is already registered: " + request.getLicensePlate());
-            }
+        String licensePlate = normalizePlate(request.getLicensePlate());
+        if (!licensePlate.equals(vehicle.getLicensePlate())
+                && driverRepository.existsByVehicleLicensePlate(licensePlate)) {
+            throw new DuplicateResourceException("Vehicle license plate is already registered: " + licensePlate);
         }
 
         vehicle.setMake(request.getMake());
         vehicle.setModel(request.getModel());
         vehicle.setYear(request.getYear());
         vehicle.setColor(request.getColor());
-        vehicle.setLicensePlate(request.getLicensePlate());
+        vehicle.setLicensePlate(licensePlate);
         vehicle.setVehicleType(request.getVehicleType());
         vehicle.setSeatingCapacity(request.getSeatingCapacity());
         vehicle.setUpdatedAt(LocalDateTime.now());
@@ -233,5 +234,10 @@ public class DriverServiceImpl implements DriverService {
         Driver savedDriver = driverRepository.save(driver);
         log.info("Interservice updated location for driver ID {} to ({}, {})", driverId, latitude, longitude);
         return DriverResponse.fromEntity(savedDriver);
+    }
+
+    /** Plates are stored upper-case so "wp cax-1234" and "WP CAX-1234" count as the same vehicle. */
+    private static String normalizePlate(String licensePlate) {
+        return licensePlate.trim().toUpperCase();
     }
 }
