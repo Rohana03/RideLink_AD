@@ -150,4 +150,27 @@ class InternalDriverControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Driver driver-doc-101 is ON_TRIP and cannot be assigned a ride"));
     }
+
+    @Test
+    @DisplayName("GET /api/drivers/internal/eligible with no nearby drivers returns 200 and an empty list")
+    void shouldReturnEmptyListWhenNoDriverAvailable() throws Exception {
+        when(driverService.findEligibleDrivers(any(), any(), any(), any(), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/drivers/internal/eligible")
+                        .header("X-Internal-Api-Key", VALID_API_KEY)
+                        .param("pickupLatitude", "6.9344")
+                        .param("pickupLongitude", "79.8428"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /api/drivers/internal/eligible with a wrong API key returns 401")
+    void shouldRejectWhenApiKeyWrong() throws Exception {
+        mockMvc.perform(get("/api/drivers/internal/eligible")
+                        .header("X-Internal-Api-Key", "wrong-key")
+                        .param("pickupLatitude", "6.9344")
+                        .param("pickupLongitude", "79.8428"))
+                .andExpect(status().isUnauthorized());
+    }
 }

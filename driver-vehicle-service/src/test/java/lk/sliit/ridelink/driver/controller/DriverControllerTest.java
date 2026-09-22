@@ -9,6 +9,7 @@ import lk.sliit.ridelink.driver.dto.*;
 import lk.sliit.ridelink.driver.entity.DriverAvailabilityStatus;
 import lk.sliit.ridelink.driver.entity.OperationalStatus;
 import lk.sliit.ridelink.driver.entity.VehicleType;
+import lk.sliit.ridelink.driver.exception.InvalidStatusTransitionException;
 import lk.sliit.ridelink.driver.service.DriverService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -223,6 +224,38 @@ class DriverControllerTest {
                         .header("Authorization", "Bearer " + PASSENGER_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value("user-drv-101"));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/drivers/me/availability while on a trip returns 409 Conflict")
+    void shouldReturnConflictWhenChangingAvailabilityOnTrip() throws Exception {
+        AvailabilityUpdateRequest req = AvailabilityUpdateRequest.builder()
+                .availabilityStatus(DriverAvailabilityStatus.OFFLINE)
+                .build();
+
+        when(driverService.updateAvailability("user-drv-101", DriverAvailabilityStatus.OFFLINE))
+                .thenThrow(new InvalidStatusTransitionException("Cannot change availability while on a trip"));
+
+        mockMvc.perform(patch("/api/drivers/me/availability")
+                        .header("Authorization", "Bearer " + validJwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value("Cannot change availability while on a trip"));
+    }
+
+    @Test
+    @DisplayName("POST /api/drivers with missing required fields returns 400")
+    void shouldRejectInvalidRegistration() throws Exception {
+        mockMvc.perform(post("/api/drivers")
+                        .header("Authorization", "Bearer " + validJwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        verify(driverService, never()).registerDriver(any(), any());
     }
 
     private static final String PASSENGER_TOKEN = "mock.passenger.token";
