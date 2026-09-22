@@ -8,6 +8,7 @@ import lk.sliit.ridelink.driver.entity.*;
 import lk.sliit.ridelink.driver.exception.BadRequestException;
 import lk.sliit.ridelink.driver.exception.DuplicateResourceException;
 import lk.sliit.ridelink.driver.exception.InvalidStatusTransitionException;
+import lk.sliit.ridelink.driver.exception.ResourceNotFoundException;
 import lk.sliit.ridelink.driver.repository.DriverRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -315,6 +316,88 @@ class DriverServiceTest {
             driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.AVAILABLE);
 
             assertEquals(DriverAvailabilityStatus.AVAILABLE, mockDriver.getAvailabilityStatus());
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Interservice (Ride Management) status transitions
+    // ---------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Internal status transitions")
+    class InternalStatusTransitions {
+
+        @Test
+        @DisplayName("AVAILABLE -> ON_TRIP succeeds when a ride is assigned")
+        void shouldAssignAvailableDriver() {
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+            when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+            driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.ON_TRIP);
+
+            assertEquals(DriverAvailabilityStatus.ON_TRIP, mockDriver.getAvailabilityStatus());
+        }
+
+        @Test
+        @DisplayName("ON_TRIP -> ON_TRIP is rejected so a driver cannot take two rides (409)")
+        void shouldRejectDoubleAssignment() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.ON_TRIP);
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(InvalidStatusTransitionException.class, () ->
+                    driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.ON_TRIP));
+            verify(driverRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("OFFLINE -> ON_TRIP is rejected (409)")
+        void shouldRejectAssigningOfflineDriver() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.OFFLINE);
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(InvalidStatusTransitionException.class, () ->
+                    driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.ON_TRIP));
+        }
+
+        @Test
+        @DisplayName("ON_TRIP -> AVAILABLE succeeds when a ride completes or is cancelled")
+        void shouldReleaseDriverAfterTrip() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.ON_TRIP);
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+            when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+            driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.AVAILABLE);
+
+            assertEquals(DriverAvailabilityStatus.AVAILABLE, mockDriver.getAvailabilityStatus());
+        }
+
+        @Test
+        @DisplayName("OFFLINE -> AVAILABLE through the internal API is rejected (409)")
+        void shouldRejectReleasingOfflineDriver() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.OFFLINE);
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(InvalidStatusTransitionException.class, () ->
+                    driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.AVAILABLE));
+        }
+
+        @Test
+        @DisplayName("Internal API cannot set OFFLINE (400)")
+        void shouldRejectUnsupportedInternalStatus() {
+            when(driverRepository.findById("driver-doc-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(BadRequestException.class, () ->
+                    driverService.updateInternalStatus("driver-doc-100", DriverAvailabilityStatus.OFFLINE));
+            verify(driverRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Unknown driver ID returns ResourceNotFoundException")
+        void shouldThrowForUnknownDriver() {
+            when(driverRepository.findById("missing-id")).thenReturn(Optional.empty());
+
+            assertThrows(ResourceNotFoundException.class, () ->
+                    driverService.updateInternalStatus("missing-id", DriverAvailabilityStatus.ON_TRIP));
         }
     }
 }

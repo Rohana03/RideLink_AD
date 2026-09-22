@@ -230,6 +230,26 @@ public class DriverServiceImpl implements DriverService {
         Driver driver = driverRepository.findById(driverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver not found with id: " + driverId));
 
+        DriverAvailabilityStatus current = driver.getAvailabilityStatus();
+        switch (status) {
+            // Assigning a ride: only an AVAILABLE driver can take it, so one driver is never on two rides
+            case ON_TRIP -> {
+                if (current != DriverAvailabilityStatus.AVAILABLE) {
+                    throw new InvalidStatusTransitionException(
+                            "Driver " + driverId + " is " + current + " and cannot be assigned a ride");
+                }
+            }
+            // Ride completed or cancelled: release the driver (repeating the call is harmless)
+            case AVAILABLE -> {
+                if (current != DriverAvailabilityStatus.ON_TRIP && current != DriverAvailabilityStatus.AVAILABLE) {
+                    throw new InvalidStatusTransitionException(
+                            "Driver " + driverId + " is " + current + " and cannot be released from a trip");
+                }
+            }
+            default -> throw new BadRequestException(
+                    "Internal status updates only support ON_TRIP or AVAILABLE, not " + status);
+        }
+
         driver.setAvailabilityStatus(status);
         driver.setUpdatedAt(LocalDateTime.now());
         Driver savedDriver = driverRepository.save(driver);
