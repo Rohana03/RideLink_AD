@@ -2,6 +2,8 @@ package lk.sliit.ridelink.driver.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -27,6 +29,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDuplicateResource(DuplicateResourceException ex, HttpServletRequest request) {
         log.warn("Duplicate resource: {}", ex.getMessage());
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateKey(DuplicateKeyException ex, HttpServletRequest request) {
+        log.warn("Unique index violation: {}", ex.getMessage());
+        return buildResponse(HttpStatus.CONFLICT,
+                "User, license number or vehicle license plate is already registered", request.getRequestURI());
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleConcurrentUpdate(OptimisticLockingFailureException ex, HttpServletRequest request) {
+        log.warn("Concurrent update rejected: {}", ex.getMessage());
+        return buildResponse(HttpStatus.CONFLICT,
+                "The driver was modified by another request. Please retry.", request.getRequestURI());
     }
 
     @ExceptionHandler(BadRequestException.class)
