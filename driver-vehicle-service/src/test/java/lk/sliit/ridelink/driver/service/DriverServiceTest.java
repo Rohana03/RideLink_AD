@@ -5,11 +5,14 @@ import lk.sliit.ridelink.driver.dto.DriverResponse;
 import lk.sliit.ridelink.driver.dto.EligibleDriverResponse;
 import lk.sliit.ridelink.driver.dto.VehicleRequest;
 import lk.sliit.ridelink.driver.entity.*;
+import lk.sliit.ridelink.driver.exception.BadRequestException;
 import lk.sliit.ridelink.driver.exception.DuplicateResourceException;
+import lk.sliit.ridelink.driver.exception.InvalidStatusTransitionException;
 import lk.sliit.ridelink.driver.repository.DriverRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -260,5 +263,58 @@ class DriverServiceTest {
         assertThrows(DuplicateResourceException.class, () ->
                 driverService.updateVehicle("driver-usr-100", update));
         verify(driverRepository, never()).save(any());
+    }
+
+    // ---------------------------------------------------------------------
+    // Driver-controlled availability rules
+    // ---------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Driver availability rules")
+    class DriverAvailabilityRules {
+
+        @Test
+        @DisplayName("Should reject a driver setting themselves ON_TRIP (400)")
+        void shouldRejectDriverSettingOnTrip() {
+            assertThrows(BadRequestException.class, () ->
+                    driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.ON_TRIP));
+            verify(driverRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should reject going OFFLINE while on a trip (409)")
+        void shouldRejectGoingOfflineWhileOnTrip() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.ON_TRIP);
+            when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(InvalidStatusTransitionException.class, () ->
+                    driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.OFFLINE));
+            assertEquals(DriverAvailabilityStatus.ON_TRIP, mockDriver.getAvailabilityStatus());
+            verify(driverRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should reject a SUSPENDED driver going AVAILABLE (409)")
+        void shouldRejectSuspendedDriverGoingAvailable() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.OFFLINE);
+            mockDriver.setOperationalStatus(OperationalStatus.SUSPENDED);
+            when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+
+            assertThrows(InvalidStatusTransitionException.class, () ->
+                    driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.AVAILABLE));
+            verify(driverRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should let an ACTIVE, OFFLINE driver go AVAILABLE")
+        void shouldAllowOfflineDriverToGoAvailable() {
+            mockDriver.setAvailabilityStatus(DriverAvailabilityStatus.OFFLINE);
+            when(driverRepository.findByUserId("driver-usr-100")).thenReturn(Optional.of(mockDriver));
+            when(driverRepository.save(any(Driver.class))).thenReturn(mockDriver);
+
+            driverService.updateAvailability("driver-usr-100", DriverAvailabilityStatus.AVAILABLE);
+
+            assertEquals(DriverAvailabilityStatus.AVAILABLE, mockDriver.getAvailabilityStatus());
+        }
     }
 }
