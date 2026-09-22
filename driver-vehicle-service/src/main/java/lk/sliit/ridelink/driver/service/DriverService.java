@@ -12,7 +12,7 @@ public interface DriverService {
 
     DriverResponse getDriverByUserId(String userId);
 
-    DriverResponse getDriverById(Long id);
+    DriverResponse getDriverById(String id);
 
     DriverResponse updateProfile(String userId, DriverUpdateRequest request);
 
@@ -30,7 +30,7 @@ public interface DriverService {
             Integer limit
     );
 
-    DriverResponse updateInternalStatus(Long driverId, DriverAvailabilityStatus status);
+    DriverResponse updateInternalStatus(String driverId, DriverAvailabilityStatus status);
 
-    DriverResponse updateInternalLocation(Long driverId, Double latitude, Double longitude);
+    DriverResponse updateInternalLocation(String driverId, Double latitude, Double longitude);
 }

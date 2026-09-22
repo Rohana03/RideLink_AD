@@ -4,13 +4,10 @@ server:
 spring:
   application:
     name: driver-vehicle-service
-  datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:driver_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:root}
-  jpa:
-    hibernate:
-      ddl-auto: update
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://${DB_HOST:localhost}:${DB_PORT:27017}/${DB_NAME:driver_db}}
+      auto-index-creation: true
 
 ridelink:
   jwt:

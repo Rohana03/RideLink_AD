@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class EligibleDriverResponse {
 
-    private Long driverId;
+    private String driverId;
     private String userId;
     private String fullName;
     private String phoneNumber;

@@ -54,7 +54,7 @@ class InternalDriverControllerTest {
     @BeforeEach
     void setUp() {
         eligibleDriver = EligibleDriverResponse.builder()
-                .driverId(1L)
+                .driverId("driver-doc-101")
                 .userId("drv-101")
                 .fullName("Sunil Silva")
                 .phoneNumber("+94771234567")
@@ -65,7 +65,6 @@ class InternalDriverControllerTest {
                 .distanceKm(1.25)
                 .serviceArea("Colombo")
                 .vehicle(VehicleResponse.builder()
-                        .id(1L)
                         .make("Toyota")
                         .model("Axio")
                         .year(2019)
@@ -90,7 +89,7 @@ class InternalDriverControllerTest {
                         .param("radiusKm", "5.0")
                         .param("limit", "5"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].driverId").value(1))
+                .andExpect(jsonPath("$[0].driverId").value("driver-doc-101"))
                 .andExpect(jsonPath("$[0].fullName").value("Sunil Silva"))
                 .andExpect(jsonPath("$[0].distanceKm").value(1.25))
                 .andExpect(jsonPath("$[0].vehicle.licensePlate").value("WP CAZ-9988"));
@@ -115,14 +114,14 @@ class InternalDriverControllerTest {
                 .build();
 
         DriverResponse response = DriverResponse.builder()
-                .id(1L)
+                .id("driver-doc-101")
                 .availabilityStatus(DriverAvailabilityStatus.ON_TRIP)
                 .build();
 
-        when(driverService.updateInternalStatus(eq(1L), eq(DriverAvailabilityStatus.ON_TRIP)))
+        when(driverService.updateInternalStatus(eq("driver-doc-101"), eq(DriverAvailabilityStatus.ON_TRIP)))
                 .thenReturn(response);
 
-        mockMvc.perform(patch("/api/drivers/internal/1/status")
+        mockMvc.perform(patch("/api/drivers/internal/driver-doc-101/status")
                         .header("X-Internal-Api-Key", VALID_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))

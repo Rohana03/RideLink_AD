@@ -2,7 +2,7 @@
 
 **Owner:** Member 2  
 **Port:** `8082`  
-**Database:** `driver_db` (MySQL) / H2 in-memory for testing  
+**Database:** `driver_db` (MongoDB)  
 **Package:** `lk.sliit.ridelink.driver`  
 
 ---
@@ -10,8 +10,8 @@
 ## 1. Overview & Responsibilities
 
 The **Driver & Vehicle Service** manages the complete operational lifecycle of drivers and their associated vehicles within the RideLink microservices architecture:
-1. **Driver Operational Profile:** Personal details, operational status (`ACTIVE`, `PENDING_APPROVAL`, `SUSPENDED`, `INACTIVE`), service area, rating, and completed trip counter.
-2. **Vehicle Details:** Vehicle specifications (`make`, `model`, `year`, `color`, `licensePlate`, `vehicleType`, `seatingCapacity`) linked 1-to-1 to each driver.
+1. **Driver Operational Profile (MongoDB Document):** Personal details, operational status (`ACTIVE`, `PENDING_APPROVAL`, `SUSPENDED`, `INACTIVE`), service area, rating, and completed trip counter.
+2. **Vehicle Details (Embedded Document):** Vehicle specifications (`make`, `model`, `year`, `color`, `licensePlate`, `vehicleType`, `seatingCapacity`) embedded within each driver document.
 3. **Availability Management:** Real-time availability toggling (`AVAILABLE`, `OFFLINE`, `ON_TRIP`, `BUSY`).
 4. **Simulated Current Location:** Dynamic GPS coordinate updates (`latitude`, `longitude`, timestamp) enabling simulated vehicle movement.
 5. **Eligible Available Driver Search (Haversine Formula):** Core matching engine called by Ride Management Service to retrieve nearby available drivers ranked by distance from the passenger's pickup location.
@@ -66,19 +66,14 @@ The matching engine in `DriverServiceImpl.findEligibleDrivers(...)`:
 
 ## 5. Running & Testing
 
-### Running with Docker Compose
+### Running MongoDB with Docker
 ```bash
-docker compose up -d mysql-driver
+docker run -d --name mongodb-driver -p 27017:27017 mongo:latest
 ```
 
-### Running the Service
-```bash
-mvn spring-boot:run
-```
-Swagger UI is accessible at: `http://localhost:8082/swagger-ui.html`
+### Running the Service (via IDE or Maven)
+- **IDE:** Run `DriverVehicleServiceApplication.java`
+- **Maven:** `mvn spring-boot:run`
+
+Swagger UI is accessible at: `http://localhost:8082/swagger-ui.html`  
 OpenAPI specification at: `http://localhost:8082/v3/api-docs`
-
-### Running Automated Tests
-```bash
-mvn clean test
-```

@@ -56,7 +56,6 @@ class DriverControllerTest {
         when(jwtUtil.extractRoles(validJwtToken)).thenReturn(List.of("DRIVER"));
 
         VehicleResponse vResp = VehicleResponse.builder()
-                .id(1L)
                 .make("Toyota")
                 .model("Aqua")
                 .year(2018)
@@ -67,7 +66,7 @@ class DriverControllerTest {
                 .build();
 
         mockDriverResponse = DriverResponse.builder()
-                .id(1L)
+                .id("driver-doc-101")
                 .userId("user-drv-101")
                 .fullName("Kasun Bandara")
                 .email("kasun@example.com")
