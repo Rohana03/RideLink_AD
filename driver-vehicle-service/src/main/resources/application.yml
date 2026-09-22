@@ -11,10 +11,11 @@ spring:
 
 ridelink:
   jwt:
-    secret: ${JWT_SECRET:ridelink-shared-secret-key-for-it3130-group-assignment-change-me}
+    # No default: must come from the JWT_SECRET env var (or a local, git-ignored application-dev.yml)
+    secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:3600000}
   internal:
-    api-key: ${INTERNAL_API_KEY:ridelink-internal-service-key-change-me}
+    api-key: ${INTERNAL_API_KEY}
 
 springdoc:
   swagger-ui:
