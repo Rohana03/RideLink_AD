@@ -2,7 +2,9 @@ package lk.sliit.ridelink.driver.service;
 
 import lk.sliit.ridelink.driver.dto.*;
 import lk.sliit.ridelink.driver.entity.*;
+import lk.sliit.ridelink.driver.exception.BadRequestException;
 import lk.sliit.ridelink.driver.exception.DuplicateResourceException;
+import lk.sliit.ridelink.driver.exception.InvalidStatusTransitionException;
 import lk.sliit.ridelink.driver.exception.ResourceNotFoundException;
 import lk.sliit.ridelink.driver.repository.DriverRepository;
 import lombok.RequiredArgsConstructor;
@@ -149,8 +151,22 @@ public class DriverServiceImpl implements DriverService {
 
     @Override
     public DriverResponse updateAvailability(String userId, DriverAvailabilityStatus status) {
+        // ON_TRIP is owned by Ride Management (via the internal API); a driver may only go on/off duty
+        if (status != DriverAvailabilityStatus.AVAILABLE && status != DriverAvailabilityStatus.OFFLINE) {
+            throw new BadRequestException("Drivers may only set their availability to AVAILABLE or OFFLINE");
+        }
+
         Driver driver = driverRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Driver profile not found for user: " + userId));
+
+        if (driver.getAvailabilityStatus() == DriverAvailabilityStatus.ON_TRIP) {
+            throw new InvalidStatusTransitionException(
+                    "Cannot change availability while on a trip; complete or cancel the ride first");
+        }
+        if (status == DriverAvailabilityStatus.AVAILABLE && driver.getOperationalStatus() != OperationalStatus.ACTIVE) {
+            throw new InvalidStatusTransitionException(
+                    "Driver account is " + driver.getOperationalStatus() + " and cannot go AVAILABLE");
+        }
 
         driver.setAvailabilityStatus(status);
         driver.setUpdatedAt(LocalDateTime.now());
