@@ -13,7 +13,7 @@
     <artifactId>driver-vehicle-service</artifactId>
     <version>1.0.0</version>
     <name>driver-vehicle-service</name>
-    <description>RideLink Driver & Vehicle Service - IT3130 Group Assignment</description>
+    <description>RideLink Driver &amp; Vehicle Service - IT3130 Group Assignment</description>
     <properties>
         <java.version>17</java.version>
         <jjwt.version>0.12.6</jjwt.version>
