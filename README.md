@@ -26,8 +26,9 @@ their own service inside their own folder.
   verify it locally using the same `JWT_SECRET` env var — no per-request call
   back to Account Service. Put a `JwtUtil` + a `OncePerRequestFilter` in each
   service's `config/` package.
-- **Data ownership:** each service gets its own MySQL database (see
-  `docker-compose.yml`) — never query another service's tables directly.
+- **Data ownership:** each service gets its own database — never query
+  another service's data directly. Account and Driver & Vehicle use MongoDB
+  (`account_db`, `driver_db`) on a local server at `localhost:27017`.
 - **Interservice calls:** Ride Management needs to call Driver & Vehicle
   (find eligible drivers) and Fare & Payment (get an estimate) — plan whether
   each interaction is synchronous REST or asynchronous messaging, and be
@@ -50,7 +51,7 @@ once the real flow is settled.
 ## Prerequisites
 
 - JDK 17, Maven 3.9+
-- Docker + Docker Compose (for MySQL and RabbitMQ)
+- MongoDB Community Server running locally on port 27017 (no Docker needed)
 - Postman and a browser (for Swagger UI, already wired via springdoc)
 
 ## Configuration
@@ -62,9 +63,11 @@ will authenticate correctly between them. `.env` is git-ignored; never commit it
 ## Running what's here so far
 
 ```bash
-docker compose up -d          # starts 4x MySQL + RabbitMQ
-cd account-service && mvn spring-boot:run
+# MongoDB must be running locally; databases are created on first use.
+cd account-service && mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
+The `dev` profile reads a git-ignored `src/main/resources/application-dev.yml`
+holding local secrets — see each service's README.
 Each service currently boots to an empty Spring Boot app on its assigned
 port with Swagger UI at `/swagger-ui.html` — there's nothing to call yet
 until controllers are added.
@@ -87,7 +90,6 @@ ridelink/
 ├── ride-management-service/
 ├── fare-payment-service/
 ├── docs/
-├── docker-compose.yml
 ├── .env.example
 └── .github/workflows/ci.yml
 ```
