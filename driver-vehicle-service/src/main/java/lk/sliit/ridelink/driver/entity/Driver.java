@@ -1,9 +1,8 @@
 package lk.sliit.ridelink.driver.entity;
 
 import lombok.*;
-import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -21,6 +20,10 @@ public class Driver {
 
     @Id
     private String id;
+
+    /** Optimistic lock: a concurrent save of a stale copy fails instead of overwriting. */
+    @Version
+    private Long version;
 
     @Indexed(unique = true)
     private String userId;
@@ -60,11 +63,9 @@ public class Driver {
 
     private Vehicle vehicle;
 
-    @CreatedDate
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @LastModifiedDate
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 }
