@@ -4,28 +4,46 @@ server:
 spring:
   application:
     name: fare-payment-service
-  datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:fare_payment_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:root}
-  jpa:
-    hibernate:
-      ddl-auto: update
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://${DB_HOST:localhost}:${DB_PORT:27017}/${DB_NAME:fare_payment_db}}
+      auto-index-creation: true
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        # A message that fails processing is dropped (and logged) instead of being redelivered forever
+        default-requeue-rejected: false
 
 ridelink:
   jwt:
-    secret: ${JWT_SECRET:ridelink-shared-secret-key-for-it3130-group-assignment-change-me}
-    expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+    # No default: must come from the JWT_SECRET env var (or a local, git-ignored application-dev.yml).
+    # Must be identical in every service and at least 32 bytes long.
+    secret: ${JWT_SECRET}
+  internal:
+    api-key: ${INTERNAL_API_KEY}
+  # Documented fare rule (all amounts in LKR):
+  #   fare = max(minimum-fare, (base-fare + per-km-rate * km + per-min-rate * minutes) * vehicle multiplier)
   fare:
+    currency: LKR
     base-fare: 100.0
     per-km-rate: 60.0
     per-min-rate: 10.0
+    minimum-fare: 200.0
     average-speed-kmh: 30.0
+    vehicle-multipliers:
+      BIKE: 0.6
+      TUK_TUK: 0.8
+      CAR: 1.0
+      SEDAN: 1.0
+      SUV: 1.3
+      VAN: 1.5
+  messaging:
+    # true = consume RideCompletedEvent from RabbitMQ; false = rely on the internal REST endpoint only
+    enabled: ${MESSAGING_ENABLED:false}
   rabbit:
     ride-events-exchange: ride.events.exchange
     ride-completed-routing-key: ride.completed

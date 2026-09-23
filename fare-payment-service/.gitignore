@@ -1,0 +1,2 @@
+# Local Spring profile holding real dev values - never commit it
+src/main/resources/application-dev.yml
