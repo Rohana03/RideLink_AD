@@ -13,7 +13,7 @@
     <artifactId>fare-payment-service</artifactId>
     <version>1.0.0</version>
     <name>fare-payment-service</name>
-    <description>RideLink Fare & Payment Service - IT3130 Group Assignment</description>
+    <description>RideLink Fare &amp; Payment Service - IT3130 Group Assignment</description>
     <properties>
         <java.version>17</java.version>
         <jjwt.version>0.12.6</jjwt.version>
