@@ -1,7 +1,9 @@
 # RideLink local development environment.
-# Brings up one MySQL instance per service (separate databases = separate
+# Brings up one database instance per service (separate databases = separate
 # persistence boundaries, per the assignment's data-ownership requirement)
 # plus a shared RabbitMQ broker for the asynchronous ride-completion event.
+# Ride Management uses MongoDB; the others use MySQL (polyglot persistence,
+# since ride documents are naturally nested/variable-shaped).
 #
 # Usage: docker compose up -d
 version: "3.8"
@@ -31,17 +33,14 @@ services:
     volumes:
       - driver_db_data:/var/lib/mysql
 
-  mysql-ride:
-    image: mysql:8.0
-    container_name: ridelink-mysql-ride
+  mongo-ride:
+    image: mongo:7
+    container_name: ridelink-mongo-ride
     restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: ride_db
     ports:
-      - "3309:3306"
+      - "27017:27017"
     volumes:
-      - ride_db_data:/var/lib/mysql
+      - ride_mongo_data:/data/db
 
   mysql-fare:
     image: mysql:8.0
@@ -66,5 +65,5 @@ services:
 volumes:
   account_db_data:
   driver_db_data:
-  ride_db_data:
+  ride_mongo_data:
   fare_db_data:
