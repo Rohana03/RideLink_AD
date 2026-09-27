@@ -79,6 +79,30 @@ The other three services currently boot to an empty Spring Boot app on their
 assigned port with Swagger UI at `/swagger-ui.html` — there's nothing to call
 yet until their controllers are added.
 
+## Testing with Postman
+
+`postman/` holds the exported collection and environment:
+
+| File | Purpose |
+|------|---------|
+| `RideLink-Ride-Management.postman_collection.json` | Ride lifecycle, retrieval filters, cancellation and negative scenarios |
+| `RideLink-Local.postman_environment.json` | Local base URLs for all four services (no secrets) |
+
+Import both into Postman, select the **RideLink - Local** environment, then
+run the collection top-to-bottom with the Collection Runner — ride ids are
+chained between requests through collection variables, and each request
+asserts its own status code and response body.
+
+To run it headlessly (same assertions, no GUI):
+
+```bash
+npx newman run postman/RideLink-Ride-Management.postman_collection.json \
+  -e postman/RideLink-Local.postman_environment.json
+```
+
+Start `ride-management-service` first. As of the last run: 18 requests,
+49 assertions, 0 failures.
+
 ## Workflow
 
 1. Push this structure to `main` first.
@@ -96,6 +120,7 @@ ridelink/
 ├── driver-vehicle-service/
 ├── ride-management-service/
 ├── fare-payment-service/
+├── postman/
 ├── docs/
 ├── docker-compose.yml
 ├── .env.example
