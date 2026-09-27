@@ -1,6 +1,7 @@
 package lk.sliit.ridelink.ride.exception;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -28,6 +30,16 @@ public class GlobalExceptionHandler {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
                 .collect(Collectors.joining("; "));
+        return buildResponse(HttpStatus.BAD_REQUEST, message, request);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, WebRequest request) {
+        Class<?> requiredType = ex.getRequiredType();
+        String allowed = requiredType != null && requiredType.isEnum()
+                ? " Allowed values: " + Arrays.toString(requiredType.getEnumConstants()) + "."
+                : "";
+        String message = "Invalid value '" + ex.getValue() + "' for parameter '" + ex.getName() + "'." + allowed;
         return buildResponse(HttpStatus.BAD_REQUEST, message, request);
     }
 
