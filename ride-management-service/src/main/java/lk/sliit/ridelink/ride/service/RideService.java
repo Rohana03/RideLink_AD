@@ -2,7 +2,6 @@ package lk.sliit.ridelink.ride.service;
 
 import java.util.List;
 
-import lk.sliit.ridelink.ride.dto.AssignDriverRequest;
 import lk.sliit.ridelink.ride.dto.CancelRideRequest;
 import lk.sliit.ridelink.ride.dto.CompleteRideRequest;
 import lk.sliit.ridelink.ride.dto.CreateRideRequest;
@@ -11,19 +10,27 @@ import lk.sliit.ridelink.ride.entity.RideStatus;
 
 public interface RideService {
 
-    RideResponse createRide(CreateRideRequest request);
+    /** Creates a REQUESTED ride with an estimate from the Fare &amp; Payment Service. */
+    RideResponse createRide(String passengerId, CreateRideRequest request);
 
-    RideResponse getRide(String rideId);
+    /** Visible to the ride's passenger, its assigned driver, or an admin. */
+    RideResponse getRide(String rideId, RideCaller caller);
 
+    /** Rides where the caller is the passenger or the assigned driver. */
+    List<RideResponse> getMyRides(RideCaller caller);
+
+    /** Admin listing; filters are optional. */
     List<RideResponse> getRides(String passengerId, String driverId, RideStatus status);
 
-    RideResponse assignDriver(String rideId, AssignDriverRequest request);
+    /** Assigns the nearest eligible driver from the Driver &amp; Vehicle Service and marks them ON_TRIP. */
+    RideResponse assignDriver(String rideId, RideCaller caller);
 
-    RideResponse acceptRide(String rideId);
+    RideResponse acceptRide(String rideId, RideCaller caller);
 
-    RideResponse startRide(String rideId);
+    RideResponse startRide(String rideId, RideCaller caller);
 
-    RideResponse completeRide(String rideId, CompleteRideRequest request);
+    /** Completes the ride, releases the driver and hands the ride to Fare &amp; Payment for the final fare. */
+    RideResponse completeRide(String rideId, RideCaller caller, CompleteRideRequest request);
 
-    RideResponse cancelRide(String rideId, CancelRideRequest request);
+    RideResponse cancelRide(String rideId, RideCaller caller, CancelRideRequest request);
 }
