@@ -1,11 +1,12 @@
 package lk.sliit.ridelink.ride.config;
 
+import java.net.http.HttpClient;
 import java.time.Duration;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -18,15 +19,18 @@ public class ServiceClientConfig {
     public static final String INTERNAL_API_KEY_HEADER = "X-Internal-Api-Key";
 
     private final String internalApiKey;
-    private final SimpleClientHttpRequestFactory requestFactory;
+    private final JdkClientHttpRequestFactory requestFactory;
 
     public ServiceClientConfig(
             @Value("${ridelink.internal.api-key}") String internalApiKey,
             @Value("${ridelink.services.connect-timeout-ms:2000}") long connectTimeoutMs,
             @Value("${ridelink.services.read-timeout-ms:5000}") long readTimeoutMs) {
         this.internalApiKey = internalApiKey;
-        this.requestFactory = new SimpleClientHttpRequestFactory();
-        this.requestFactory.setConnectTimeout(Duration.ofMillis(connectTimeoutMs));
+        // java.net.http.HttpClient: unlike HttpURLConnection it supports PATCH, used for driver status changes
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .build();
+        this.requestFactory = new JdkClientHttpRequestFactory(httpClient);
         this.requestFactory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
     }
 

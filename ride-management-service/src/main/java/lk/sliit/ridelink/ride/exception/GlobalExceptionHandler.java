@@ -55,7 +55,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DownstreamServiceException.class)
     public ResponseEntity<ApiError> handleDownstream(DownstreamServiceException ex, WebRequest request) {
-        log.warn("Downstream service failure: {}", ex.getMessage());
+        log.warn("Downstream service failure: {} (cause: {})", ex.getMessage(),
+                ex.getCause() != null ? ex.getCause().toString() : "none");
         return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request);
     }
 
