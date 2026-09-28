@@ -3,11 +3,14 @@ name: RideLink CI
 # Builds and tests all four microservices independently on every push and
 # pull request, satisfying the "CI pipeline that automatically builds and
 # runs tests for all four services" requirement (section 6.4 of the brief).
+# Branch names match the team's workflow: service branches (Account, Driver,
+# Ride, Payment, feature/**) are merged into Develop by pull request, and
+# Develop is merged into main for the release.
 on:
   push:
-    branches: [ "main", "develop", "feature/**" ]
+    branches: [ "**" ]
   pull_request:
-    branches: [ "main", "develop" ]
+    branches: [ "main", "Develop" ]
 
 jobs:
   build-and-test:
