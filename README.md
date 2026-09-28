@@ -26,8 +26,11 @@ their own service inside their own folder.
   verify it locally using the same `JWT_SECRET` env var — no per-request call
   back to Account Service. Put a `JwtUtil` + a `OncePerRequestFilter` in each
   service's `config/` package.
-- **Data ownership:** each service gets its own MySQL database (see
-  `docker-compose.yml`) — never query another service's tables directly.
+- **Data ownership:** each service gets its own database (see
+  `docker-compose.yml`) — never query another service's tables/collections
+  directly. Account, Driver & Vehicle and Fare & Payment use MySQL; Ride
+  Management uses MongoDB (`mongo-ride` container, port 27017) since ride
+  documents are naturally nested/variable-shaped.
 - **Interservice calls:** Ride Management needs to call Driver & Vehicle
   (find eligible drivers) and Fare & Payment (get an estimate) — plan whether
   each interaction is synchronous REST or asynchronous messaging, and be
@@ -62,12 +65,43 @@ will authenticate correctly between them. `.env` is git-ignored; never commit it
 ## Running what's here so far
 
 ```bash
-docker compose up -d          # starts 4x MySQL + RabbitMQ
+docker compose up -d          # starts 3x MySQL + MongoDB + RabbitMQ
 cd account-service && mvn spring-boot:run
 ```
-Each service currently boots to an empty Spring Boot app on its assigned
-port with Swagger UI at `/swagger-ui.html` — there's nothing to call yet
-until controllers are added.
+
+Ride Management Service now has ride request/lifecycle endpoints under
+`/api/rides` (create, retrieve, assign/accept/start/complete/cancel) backed
+by MongoDB — see `ride-management-service`. It connects to
+`mongodb://localhost:27017/ride_db` by default (override with `MONGODB_URI`),
+so either run `docker compose up -d mongo-ride` or point it at a locally
+installed MongoDB instance.
+The other three services currently boot to an empty Spring Boot app on their
+assigned port with Swagger UI at `/swagger-ui.html` — there's nothing to call
+yet until their controllers are added.
+
+## Testing with Postman
+
+`postman/` holds the exported collection and environment:
+
+| File | Purpose |
+|------|---------|
+| `RideLink-Ride-Management.postman_collection.json` | Ride lifecycle, retrieval filters, cancellation and negative scenarios |
+| `RideLink-Local.postman_environment.json` | Local base URLs for all four services (no secrets) |
+
+Import both into Postman, select the **RideLink - Local** environment, then
+run the collection top-to-bottom with the Collection Runner — ride ids are
+chained between requests through collection variables, and each request
+asserts its own status code and response body.
+
+To run it headlessly (same assertions, no GUI):
+
+```bash
+npx newman run postman/RideLink-Ride-Management.postman_collection.json \
+  -e postman/RideLink-Local.postman_environment.json
+```
+
+Start `ride-management-service` first. As of the last run: 18 requests,
+49 assertions, 0 failures.
 
 ## Workflow
 
@@ -86,6 +120,7 @@ ridelink/
 ├── driver-vehicle-service/
 ├── ride-management-service/
 ├── fare-payment-service/
+├── postman/
 ├── docs/
 ├── docker-compose.yml
 ├── .env.example
