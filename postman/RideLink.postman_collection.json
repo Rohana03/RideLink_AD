@@ -2377,6 +2377,55 @@
               }
             }
           }
+        },
+        {
+          "name": "Cleanup: driver goes OFFLINE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('OFFLINE', () => pm.expect(pm.response.json().availabilityStatus).to.eql('OFFLINE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{driverUrl}}/api/drivers/me/availability",
+              "host": [
+                "{{driverUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "availability"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availabilityStatus\": \"OFFLINE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
         }
       ]
     }
