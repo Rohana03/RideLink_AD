@@ -14,4 +14,7 @@ public interface RideRepository extends MongoRepository<Ride, String> {
     List<Ride> findByDriverId(String driverId);
 
     List<Ride> findByStatus(RideStatus status);
+
+    /** "My rides" for either side of a ride. */
+    List<Ride> findByPassengerIdOrDriverUserIdOrderByRequestedAtDesc(String passengerId, String driverUserId);
 }
