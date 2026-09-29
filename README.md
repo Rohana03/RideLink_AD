@@ -102,7 +102,7 @@ cd <service> && mvn clean verify
 
 **End-to-end:** with all four services running, import `postman/RideLink.postman_collection.json` and
 `postman/RideLink-Local.postman_environment.json`, set `internalApiKey` and `adminPassword` to your local values,
-and run the collection. It walks all seven required workflows (53 requests, each asserting its status) and can
+and run the collection. It walks all seven required workflows (54 requests, each asserting its status) and can
 also be run from the command line:
 
 ```bash
