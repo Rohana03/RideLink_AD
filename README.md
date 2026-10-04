@@ -11,10 +11,10 @@ are recorded. There is no frontend: Swagger UI and the Postman collection are th
 
 | # | Service | Port | Database | Owner | Responsibility |
 |---|---------|------|----------|-------|----------------|
-| 1 | [account-service](account-service/README.md) | 8081 | `account_db` | *(name, student ID)* | Registration, login and JWT issuance, roles, profiles, account status |
-| 2 | [driver-vehicle-service](driver-vehicle-service/README.md) | 8082 | `driver_db` | E.M.R.T Ekanayaka (IT24102102)* | Driver profile, vehicle, availability, service area, location, eligible-driver search |
+| 1 | [account-service](account-service/README.md) | 8081 | `account_db` | H.M.N Dilhan (IT24103618) | Registration, login and JWT issuance, roles, profiles, account status |
+| 2 | [driver-vehicle-service](driver-vehicle-service/README.md) | 8082 | `driver_db` | E.M.R.T Ekanayaka (IT24102102) | Driver profile, vehicle, availability, service area, location, eligible-driver search |
 | 3 | [ride-management-service](ride-management-service/README.md) | 8083 | `ride_db` | E.M.K.K Ekanayaka (IT24102171) | Ride requests, driver assignment, ride lifecycle, cancellation, retrieval |
-| 4 | [fare-payment-service](fare-payment-service/README.md) | 8084 | `fare_payment_db` | *(name, student ID)* | Fare estimate, final fare, simulated payment, payment status, receipts |
+| 4 | [fare-payment-service](fare-payment-service/README.md) | 8084 | `fare_payment_db` | M.D.M.T.B Dasanayake (IT23755574) | Fare estimate, final fare, simulated payment, payment status, receipts |
 
 Each service's README documents its endpoints, business rules, error codes and tests.
 
