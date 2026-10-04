@@ -4,18 +4,23 @@ server:
 spring:
   application:
     name: account-service
-  datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:account_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:root}
-  jpa:
-    hibernate:
-      ddl-auto: update
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://${DB_HOST:localhost}:${DB_PORT:27017}/${DB_NAME:account_db}}
+      auto-index-creation: true
 
 ridelink:
   jwt:
-    secret: ${JWT_SECRET:ridelink-shared-secret-key-for-it3130-group-assignment-change-me}
+    # No default: must come from the JWT_SECRET env var (or a local, git-ignored application-dev.yml).
+    # Must be identical in every service and at least 32 bytes long.
+    secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+  internal:
+    api-key: ${INTERNAL_API_KEY}
+  admin:
+    # Optional bootstrap admin, created at start-up only when both values are set.
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
 
 springdoc:
   swagger-ui:

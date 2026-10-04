@@ -4,13 +4,9 @@ server:
 spring:
   application:
     name: ride-management-service
-  datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ride_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:root}
-  jpa:
-    hibernate:
-      ddl-auto: update
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/ride_db}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -19,17 +15,27 @@ spring:
 
 ridelink:
   jwt:
-    secret: ${JWT_SECRET:ridelink-shared-secret-key-for-it3130-group-assignment-change-me}
-    expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+    # No default: must come from the JWT_SECRET env var (or a local, git-ignored application-dev.yml).
+    # Must be identical in every service and at least 32 bytes long.
+    secret: ${JWT_SECRET}
   internal:
-    api-key: ${INTERNAL_API_KEY:ridelink-internal-service-key-change-me}
+    # Sent as X-Internal-Api-Key on calls to Driver & Vehicle and Fare & Payment. No default.
+    api-key: ${INTERNAL_API_KEY}
   services:
     driver-vehicle-base-url: ${DRIVER_SERVICE_URL:http://localhost:8082}
     fare-payment-base-url: ${FARE_SERVICE_URL:http://localhost:8084}
+    connect-timeout-ms: 2000
+    read-timeout-ms: 5000
+  # Driver assignment: nearest AVAILABLE driver within radius-km of the pickup
+  matching:
+    radius-km: 5.0
+    max-candidates: 5
+  messaging:
+    # false = report completed rides to Fare & Payment over REST; true = publish RideCompletedEvent to RabbitMQ
+    enabled: ${MESSAGING_ENABLED:false}
   rabbit:
     ride-events-exchange: ride.events.exchange
     ride-completed-routing-key: ride.completed
-    ride-completed-queue: ride.completed.queue
 
 springdoc:
   swagger-ui:

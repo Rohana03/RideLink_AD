@@ -1,0 +1,2434 @@
+{
+  "info": {
+    "_postman_id": "2d27fe19-5d82-403e-b5ee-65ed3fd1f54a",
+    "name": "RideLink - End-to-end workflows",
+    "description": "IT3130 RideLink. Runs every required workflow across the four services in order: accounts and roles, driver preparation, fare estimation, ride request and assignment, ride lifecycle, completion and payment, and negative scenarios. Every request asserts its status code; ids and tokens are passed between requests as collection variables, and a fresh run id keeps emails and plates unique.\n\nBefore running: start all four services with the dev profile, import RideLink-Local environment and set internalApiKey and adminPassword to your local values. Run the whole collection with the Collection Runner.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Accounts and roles",
+      "item": [
+        {
+          "name": "Register passenger",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const run = Date.now().toString().slice(-7);",
+                  "pm.collectionVariables.set('runId', run);",
+                  "pm.collectionVariables.set('passengerName', 'Amaya Silva');",
+                  "pm.collectionVariables.set('passengerEmail', `amaya.${run}@example.com`);",
+                  "pm.collectionVariables.set('passenger2Name', 'Kamal Fernando');",
+                  "pm.collectionVariables.set('passenger2Email', `kamal.${run}@example.com`);",
+                  "pm.collectionVariables.set('driverName', 'Nimal Perera');",
+                  "pm.collectionVariables.set('driverEmail', `nimal.${run}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const a = pm.response.json();",
+                  "pm.test('Registered as ACTIVE PASSENGER, no password returned', () => {",
+                  "    pm.expect(a.role).to.eql('PASSENGER'); pm.expect(a.status).to.eql('ACTIVE');",
+                  "    pm.expect(a).to.not.have.property('passwordHash');",
+                  "});",
+                  "pm.collectionVariables.set('passengerId', a.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/register",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"{{passengerName}}\",\n  \"email\": \"{{passengerEmail}}\",\n  \"password\": \"Passw0rd123\",\n  \"phoneNumber\": \"+94771112233\",\n  \"role\": \"PASSENGER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Register second passenger",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('passenger2Id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/register",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"{{passenger2Name}}\",\n  \"email\": \"{{passenger2Email}}\",\n  \"password\": \"Passw0rd123\",\n  \"phoneNumber\": \"+94771112233\",\n  \"role\": \"PASSENGER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Register driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('driverUserId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/register",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"{{driverName}}\",\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"Passw0rd123\",\n  \"phoneNumber\": \"+94771112233\",\n  \"role\": \"DRIVER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login passenger",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.test('Bearer token issued', () => pm.expect(t.tokenType).to.eql('Bearer'));",
+                  "pm.collectionVariables.set('passengerToken', t.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/login",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{passengerEmail}}\",\n  \"password\": \"Passw0rd123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login second passenger",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('passenger2Token', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/login",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{passenger2Email}}\",\n  \"password\": \"Passw0rd123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('driverToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/login",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"Passw0rd123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('adminToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/login",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Duplicate email -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/register",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"{{passengerName}}\",\n  \"email\": \"{{passengerEmail}}\",\n  \"password\": \"Passw0rd123\",\n  \"phoneNumber\": \"+94771112233\",\n  \"role\": \"PASSENGER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Self-register as ADMIN -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/register",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Mallory\",\n  \"email\": \"mallory.{{runId}}@example.com\",\n  \"password\": \"Passw0rd123\",\n  \"phoneNumber\": \"+94771112233\",\n  \"role\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Wrong password -> 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/login",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{passengerEmail}}\",\n  \"password\": \"WrongPass1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Invalid input -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/register",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"short\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Driver preparation",
+      "item": [
+        {
+          "name": "Create driver profile and vehicle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json();",
+                  "pm.test('Linked to the driver account', () => pm.expect(d.userId).to.eql(pm.collectionVariables.get('driverUserId')));",
+                  "pm.collectionVariables.set('driverId', d.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{driverUrl}}/api/drivers",
+              "host": [
+                "{{driverUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nimal Perera\",\n  \"phoneNumber\": \"+94771234567\",\n  \"licenseNumber\": \"DL-{{runId}}\",\n  \"serviceArea\": \"Galle\",\n  \"serviceRadiusKm\": 15.0,\n  \"vehicle\": {\n    \"make\": \"Toyota\",\n    \"model\": \"Aqua\",\n    \"year\": 2018,\n    \"color\": \"White\",\n    \"licensePlate\": \"SP CAB-{{runId}}\",\n    \"vehicleType\": \"CAR\",\n    \"seatingCapacity\": 4\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Set simulated location (Galle Fort)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{driverUrl}}/api/drivers/me/location",
+              "host": [
+                "{{driverUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "location"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 6.0269,\n  \"longitude\": 80.217\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Go AVAILABLE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('AVAILABLE', () => pm.expect(pm.response.json().availabilityStatus).to.eql('AVAILABLE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{driverUrl}}/api/drivers/me/availability",
+              "host": [
+                "{{driverUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "availability"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availabilityStatus\": \"AVAILABLE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Passenger creates a driver profile -> 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{driverUrl}}/api/drivers",
+              "host": [
+                "{{driverUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"X\",\n  \"phoneNumber\": \"+94770000000\",\n  \"licenseNumber\": \"DL-X{{runId}}\",\n  \"vehicle\": {\n    \"make\": \"X\",\n    \"model\": \"X\",\n    \"year\": 2020,\n    \"color\": \"X\",\n    \"licensePlate\": \"X-{{runId}}\",\n    \"vehicleType\": \"CAR\",\n    \"seatingCapacity\": 4\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Fare estimation",
+      "item": [
+        {
+          "name": "Estimate Galle Fort -> Unawatuna",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const f = pm.response.json();",
+                  "pm.test('Follows max(200, (100 + 60 x km + 10 x min) x multiplier)', () => {",
+                  "    const raw = (100 + 60 * f.distanceKm + 10 * f.durationMinutes) * f.vehicleMultiplier;",
+                  "    const expected = Math.max(200, Math.round(raw * 100) / 100);",
+                  "    pm.expect(f.totalFare).to.be.closeTo(expected, 0.01);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/fares/estimate",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "fares",
+                "estimate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLatitude\": 6.0269,\n  \"pickupLongitude\": 80.217,\n  \"dropoffLatitude\": 6.01,\n  \"dropoffLongitude\": 80.249,\n  \"vehicleType\": \"CAR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Out-of-range coordinates -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/fares/estimate",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "fares",
+                "estimate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLatitude\": 95,\n  \"pickupLongitude\": 80.2,\n  \"dropoffLatitude\": 6.0,\n  \"dropoffLongitude\": 80.2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Ride request and assignment",
+      "item": [
+        {
+          "name": "Request ride (estimate from Fare & Payment)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('REQUESTED, for the signed-in passenger, with an estimate', () => {",
+                  "    pm.expect(r.status).to.eql('REQUESTED');",
+                  "    pm.expect(r.passengerId).to.eql(pm.collectionVariables.get('passengerId'));",
+                  "    pm.expect(r.estimatedFare).to.be.above(0);",
+                  "});",
+                  "pm.collectionVariables.set('rideId', r.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": {\n    \"label\": \"Galle Fort\",\n    \"latitude\": 6.0269,\n    \"longitude\": 80.217\n  },\n  \"destinationLocation\": {\n    \"label\": \"Unawatuna\",\n    \"latitude\": 6.01,\n    \"longitude\": 80.249\n  },\n  \"vehicleType\": \"CAR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Request without token -> 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": {\n    \"label\": \"Galle Fort\",\n    \"latitude\": 6.0269,\n    \"longitude\": 80.217\n  },\n  \"destinationLocation\": {\n    \"label\": \"Unawatuna\",\n    \"latitude\": 6.01,\n    \"longitude\": 80.249\n  },\n  \"vehicleType\": \"CAR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Driver requests a ride -> 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": {\n    \"label\": \"Galle Fort\",\n    \"latitude\": 6.0269,\n    \"longitude\": 80.217\n  },\n  \"destinationLocation\": {\n    \"label\": \"Unawatuna\",\n    \"latitude\": 6.01,\n    \"longitude\": 80.249\n  },\n  \"vehicleType\": \"CAR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Another passenger assigns this ride -> 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passenger2Token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{rideId}}/assign",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Assign nearest available driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('ASSIGNED to our driver', () => {",
+                  "    pm.expect(r.status).to.eql('ASSIGNED');",
+                  "    pm.expect(r.driverId).to.eql(pm.collectionVariables.get('driverId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{rideId}}/assign",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Driver is now ON_TRIP (Driver & Vehicle internal API)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ON_TRIP', () => pm.expect(pm.response.json().availabilityStatus).to.eql('ON_TRIP'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Api-Key",
+                "value": "{{internalApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{driverUrl}}/api/drivers/internal/{{driverId}}",
+              "host": [
+                "{{driverUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "internal",
+                "{{driverId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Ride lifecycle",
+      "item": [
+        {
+          "name": "[negative] Complete before start -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{rideId}}/complete",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "complete"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[negative] Passenger accepts -> 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{rideId}}/accept",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "accept"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Driver accepts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ACCEPTED', () => pm.expect(pm.response.json().status).to.eql('ACCEPTED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{rideId}}/accept",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "accept"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Driver starts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('IN_PROGRESS', () => pm.expect(pm.response.json().status).to.eql('IN_PROGRESS'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{rideId}}/start",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "start"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[negative] Cancel while IN_PROGRESS -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{rideId}}/cancel",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "cancel"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Too late\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Completion and payment",
+      "item": [
+        {
+          "name": "Driver completes (5.4 km, 14 min)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('COMPLETED with final fare 100 + 60 x 5.4 + 10 x 14 = 564.00', () => {",
+                  "    pm.expect(r.status).to.eql('COMPLETED');",
+                  "    pm.expect(r.finalFare).to.eql(564);",
+                  "    pm.expect(r.fareRecorded).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{rideId}}/complete",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "complete"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"actualDistanceKm\": 5.4,\n  \"actualDurationMinutes\": 14\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Driver is AVAILABLE again",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('AVAILABLE', () => pm.expect(pm.response.json().availabilityStatus).to.eql('AVAILABLE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Api-Key",
+                "value": "{{internalApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{driverUrl}}/api/drivers/internal/{{driverId}}",
+              "host": [
+                "{{driverUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "internal",
+                "{{driverId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Payment opened by Fare & Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('PENDING for 564.00', () => { pm.expect(p.status).to.eql('PENDING'); pm.expect(p.totalAmount).to.eql(564); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/payments/{{rideId}}",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{rideId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[negative] Receipt before payment -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/receipts/{{rideId}}",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "receipts",
+                "{{rideId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[negative] Declined card -> 402",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 402', () => pm.response.to.have.status(402));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/payments/{{rideId}}/pay",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{rideId}}",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"CARD\",\n  \"cardNumber\": \"4111111111110000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Another passenger pays -> 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passenger2Token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/payments/{{rideId}}/pay",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{rideId}}",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"CASH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Pay by card",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('PAID after a retry, only last 4 digits kept', () => {",
+                  "    pm.expect(p.status).to.eql('PAID'); pm.expect(p.attempts).to.eql(2); pm.expect(p.cardLast4).to.eql('1111');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/payments/{{rideId}}/pay",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{rideId}}",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"CARD\",\n  \"cardNumber\": \"4111111111111111\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Pay twice -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/payments/{{rideId}}/pay",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{rideId}}",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"CASH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Receipt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Receipt with number, total and fare rule', () => {",
+                  "    pm.expect(r.receiptNumber).to.match(/^RCP-/); pm.expect(r.totalAmount).to.eql(564); pm.expect(r.fareRule).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/receipts/{{rideId}}",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "receipts",
+                "{{rideId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Driver can view the receipt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/receipts/{{rideId}}",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "receipts",
+                "{{rideId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. More negative scenarios and cancellation",
+      "item": [
+        {
+          "name": "Request ride in Jaffna",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('farRideId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": {\n    \"label\": \"Jaffna Fort\",\n    \"latitude\": 9.6615,\n    \"longitude\": 80.0255\n  },\n  \"destinationLocation\": {\n    \"label\": \"Galle Fort\",\n    \"latitude\": 6.0269,\n    \"longitude\": 80.217\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] No available driver -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});",
+                  "pm.test('Explains why', () => pm.expect(pm.response.json().message).to.include('No available driver'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{farRideId}}/assign",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{farRideId}}",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Request second ride in Galle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('ride2Id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": {\n    \"label\": \"Galle Fort\",\n    \"latitude\": 6.0269,\n    \"longitude\": 80.217\n  },\n  \"destinationLocation\": {\n    \"label\": \"Unawatuna\",\n    \"latitude\": 6.01,\n    \"longitude\": 80.249\n  },\n  \"vehicleType\": \"CAR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Assign driver to second ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{ride2Id}}/assign",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{ride2Id}}",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Passenger cancels second ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('CANCELLED', () => pm.expect(pm.response.json().status).to.eql('CANCELLED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{ride2Id}}/cancel",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{ride2Id}}",
+                "cancel"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Plans changed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancelled ride released the driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('AVAILABLE', () => pm.expect(pm.response.json().availabilityStatus).to.eql('AVAILABLE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Internal-Api-Key",
+                "value": "{{internalApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{driverUrl}}/api/drivers/internal/{{driverId}}",
+              "host": [
+                "{{driverUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "internal",
+                "{{driverId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[negative] Another passenger views the ride -> 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passenger2Token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{rideId}}",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[negative] Internal API without key -> 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{driverUrl}}/api/drivers/internal/{{driverId}}",
+              "host": [
+                "{{driverUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "internal",
+                "{{driverId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Retrieval and administration",
+      "item": [
+        {
+          "name": "My rides (passenger)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Three rides', () => pm.expect(pm.response.json().length).to.eql(3));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/me",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get ride (assigned driver)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides/{{rideId}}",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin lists completed rides",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides?status=COMPLETED",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "COMPLETED"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin lists paid payments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fareUrl}}/api/payments?status=PAID",
+              "host": [
+                "{{fareUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PAID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "[negative] Passenger lists all rides -> 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{rideUrl}}/api/rides",
+              "host": [
+                "{{rideUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin suspends second passenger",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/accounts/{{passenger2Id}}/status",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts",
+                "{{passenger2Id}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"SUSPENDED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "[negative] Suspended account cannot log in -> 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Standard error body', () => {",
+                  "    const e = pm.response.json();",
+                  "    pm.expect(e).to.include.keys('timestamp', 'status', 'error', 'message', 'path');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{accountUrl}}/api/auth/login",
+              "host": [
+                "{{accountUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{passenger2Email}}\",\n  \"password\": \"Passw0rd123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cleanup: driver goes OFFLINE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('OFFLINE', () => pm.expect(pm.response.json().availabilityStatus).to.eql('OFFLINE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{driverUrl}}/api/drivers/me/availability",
+              "host": [
+                "{{driverUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "availability"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availabilityStatus\": \"OFFLINE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": []
+}
